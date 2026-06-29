@@ -2097,7 +2097,7 @@ ${commentsHistory}
 [MEETING FLOW FOR THIS ROUND]
 1. Each relevant Team Role Agent discusses the requirements, addresses comments, or proposes code/architecture approaches.
 2. If the task is too complex, any agent can explicitly split it into sub-cards by outputting:
-   [CREATE_SUBCARD: Subcard Title | Subcard Description]
+   [CREATE_SUBCARD: <actual title of subtask> | <actual description of subtask>] (Replace the placeholders with the actual title and description of the subtask. Do not output the words 'Subcard Title' or '<actual title of subtask>' literally.)
 3. If new specialized team members are required, recruit them by outputting:
    [CREATE_AGENT: Role Name | Role System Prompt]
 4. Finally, follow the Meeting Room Moderator Guidelines above to evaluate all inputs and conclude this round's discussion with ONE of the following status tags at the very end:
@@ -2172,7 +2172,7 @@ ${commentsHistory}
 [YOUR TASK STEPS]
 1. Analyze the card requirements against the team role agents listed above, and select the best qualified agent to own this task. Output [ASSIGN_TO: Agent Name].
 2. Perform the required work, execution, implementation, or data analysis for column phase "${column.name}". Resolve multi-step subtasks internally within your own workflow execution whenever possible.
-3. Subcard creation guidelines (STRICT NECESSITY ONLY): Do NOT create sub-cards for routine multi-step work. ONLY output [CREATE_SUBCARD: Subcard Title | Subcard Description] if a subtask is genuinely too massive and strictly requires independent parallel tracking by separate team roles.
+3. Subcard creation guidelines (STRICT NECESSITY ONLY): Do NOT create sub-cards for routine multi-step work. ONLY output [CREATE_SUBCARD: <actual title of subtask> | <actual description of subtask>] (replacing with the actual sub-task name and description, do not use the placeholders literally) if a subtask is genuinely too massive and strictly requires independent parallel tracking by separate team roles.
 4. When your work is complete or ready for the next phase, output [MOVE_TO: Target Column Name] (e.g. [MOVE_TO: Done] or next target column).
 
 Available transition columns: ${columnsList}
@@ -2197,7 +2197,7 @@ ${commentsHistory}
 [TRANSITION DIRECTIVES & WORKFLOW COMPLETION]
 You are processing this Kanban card as an autonomous agent.
 1. Perform the required task processing, implementation, code writing, or analysis for phase "${column.name}". Process multi-step subtasks directly inside your own execution workflow.
-2. Subcard creation guidelines (STRICT NECESSITY ONLY): Do NOT create sub-cards for standard work steps. ONLY output [CREATE_SUBCARD: Subcard Title | Subcard Description] if a task is extraordinarily complex and strictly requires delegating to a separate asynchronous card.
+2. Subcard creation guidelines (STRICT NECESSITY ONLY): Do NOT create sub-cards for standard work steps. ONLY output [CREATE_SUBCARD: <actual title of subtask> | <actual description of subtask>] (replacing with the actual sub-task name and description, do not use the placeholders literally) if a task is extraordinarily complex and strictly requires delegating to a separate asynchronous card.
 3. When your work on this card is finished or ready to move to another stage, you MUST output the following tag at the very end of your response:
 [MOVE_TO: Column Name] (For example: [MOVE_TO: Done] when completed).
 
