@@ -1627,8 +1627,14 @@ function processAgentDirectives(freshKanban, freshCard, text) {
       
       // Safeguard: Check if the model literally output the template/placeholder text
       const isPlaceholder = [
+        'title',
+        'description',
+        '<title>',
+        '<description>',
         'subcard title',
         'subcard description',
+        '<subcard title>',
+        '<subcard description>',
         '<actual title of subtask>',
         '<actual description of subtask>',
         'actual title of subtask',
@@ -1646,7 +1652,11 @@ function processAgentDirectives(freshKanban, freshCard, text) {
       subTitle.toLowerCase().includes('your_subtask') || 
       subTitle.toLowerCase().includes('your subtask') || 
       subTitle.toLowerCase().includes('subcard title') ||
-      subTitle.toLowerCase().includes('specify subtask');
+      subTitle.toLowerCase().includes('specify subtask') ||
+      subTitle.toLowerCase() === 'title' ||
+      subTitle.toLowerCase() === 'description' ||
+      subTitle.toLowerCase() === '<title>' ||
+      subTitle.toLowerCase() === '<description>';
 
       if (subTitle && !isPlaceholder) {
         const subCardId = 'card-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
@@ -1716,7 +1726,9 @@ function processAgentDirectives(freshKanban, freshCard, text) {
     ].includes(agName.toLowerCase()) || 
     agName.toLowerCase().includes('<role name') || 
     agName.toLowerCase().includes('role name') || 
-    agName.toLowerCase().includes('your_role');
+    agName.toLowerCase().includes('your_role') ||
+    agName.toLowerCase() === 'role name' ||
+    agName.toLowerCase() === '<role name>';
 
     if (agName && !isPlaceholder) {
       const existing = freshKanban.agents ? freshKanban.agents.find(a => a.name.toLowerCase() === agName.toLowerCase()) : null;
