@@ -36,8 +36,7 @@
       
       <!-- Tab Swapper -->
       <nav class="portal-tabs">
-        <button id="tab-chat" class="tab-btn active">💬 Chat Workspace</button>
-        <button id="tab-kanban" class="tab-btn">📋 Kanban Board</button>
+        <button id="tab-kanban" class="tab-btn active">📋 Kanban Workspaces</button>
         <button id="tab-config" class="tab-btn">⚙️ Settings</button>
       </nav>
 
@@ -52,191 +51,267 @@
     <!-- Content Workspace -->
     <div class="portal-body">
       
-      <!-- View 1: Chat Workspace (Default) -->
-      <div id="view-chat" class="view-container active">
-        <div class="app-container">
-          <!-- Sidebar -->
-          <aside class="sidebar">
-            <div class="sidebar-header">
-              <h3>Sessions</h3>
-              <button id="new-task-btn" class="icon-btn" title="New Session">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19"></line>
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-              </button>
-            </div>
-
-            <div class="sidebar-section-title">
-              <span>CONVERSATIONS</span>
-              <button id="clear-history-btn" class="text-btn">Clear All</button>
-            </div>
-
-            <div id="history-list" class="history-list">
-              <div class="empty-history">No sessions yet</div>
-            </div>
-
-            <div class="sidebar-footer">
-              <div class="status-badge active">
-                <span class="pulse-dot"></span>
-                <span>Workspace Active</span>
+      <!-- View: Kanban Board Workspace (Default Active View) -->
+      <div id="view-kanban" class="view-container active">
+        
+        <!-- Subview 1: Kanban Board Grid View -->
+        <div id="kanban-board-subview" class="kanban-subview">
+          <div class="kanban-workspace">
+            <header class="kanban-header">
+              <div class="header-left">
+                <h2>Agent Workflow Kanban Board</h2>
+                <p class="subtitle">Drag cards between columns to trigger customized Hermes Agent processing.</p>
               </div>
-            </div>
-          </aside>
-
-          <!-- Sidebar Overlay for mobile -->
-          <div id="sidebar-overlay" class="sidebar-overlay"></div>
-
-          <!-- Main Chat Panel -->
-          <main class="workspace">
-            <!-- Top navbar -->
-            <header class="workspace-header">
-              <div style="display: flex; align-items: center;">
-                <button id="sidebar-toggle" class="icon-btn sidebar-toggle-btn" title="Toggle History">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="3" y1="12" x2="21" y2="12"></line>
-                    <line x1="3" y1="6" x2="21" y2="6"></line>
-                    <line x1="3" y1="18" x2="21" y2="18"></line>
-                  </svg>
-                </button>
-                <div class="header-left">
-                  <h1>Hermes Chat</h1>
-                  <p class="subtitle">Execute agent instructions programmatically.</p>
-                </div>
-              </div>
-              
               <div class="header-right">
-                <div class="connection-status">
-                  <span class="status-label">Active Session:</span>
-                  <span id="session-badge" class="status-value highlight">New Session</span>
-                  <button id="reset-session-btn" class="icon-btn" title="Start New Session" style="width: 20px; height: 20px; border-radius: 4px; margin-left: 8px; border: none; background: rgba(255, 255, 255, 0.05); padding: 2px;">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+                <div class="project-selector-container">
+                  <span class="project-selector-label">Active Project:</span>
+                  <select id="project-select" class="dropdown-select project-dropdown">
+                    <!-- Project options -->
+                  </select>
+                  <button id="project-add-btn" class="icon-btn" title="Create New Project">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                  </button>
+                  <button id="project-edit-btn" class="icon-btn" title="Manage Project" style="margin-left: 4px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="3"></circle>
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                     </svg>
                   </button>
                 </div>
+                <button id="open-full-chat-btn" class="glow-button" style="margin-right: 8px; background: linear-gradient(135deg, #06b6d4, #3b82f6);">
+                  <span>💬 Workspace Chat Window</span>
+                </button>
+                <button id="manage-agents-btn" class="glow-button" style="margin-right: 8px;">
+                  <span>🤖 Roles</span>
+                </button>
+                <button id="add-column-btn" class="glow-button">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                  <span>Add Column</span>
+                </button>
               </div>
             </header>
 
-            <!-- Chat Messages -->
-            <div id="chat-messages" class="chat-messages">
-              <div class="welcome-container" id="welcome-container">
-                <div class="welcome-icon">💬</div>
-                <h2>Interactive Chat Assistant</h2>
-                <p>Submit instructions directly to Hermes and see results in real-time.</p>
+            <!-- Board Columns Grid Header & Scope Panel -->
+            <div id="project-scope-panel" class="project-scope-panel">
+              <div class="scope-panel-header">
+                <div class="scope-title">
+                  <span>🎯 Project Management Terms & Scope</span>
+                  <span id="scope-summary-preview" style="font-size: 0.8rem; font-weight: 400; color: var(--text-muted); margin-left: 10px;">(Click Edit to view details)</span>
+                  <span id="scope-last-updated" class="scope-time-badge">Just updated</span>
+                </div>
+                <div class="scope-actions">
+                  <button id="project-chat-toggle-btn" class="glow-button sm-btn" style="background: linear-gradient(135deg, #a855f7, #06b6d4);">🎯 Project Planner</button>
+                  <button id="scope-edit-btn" class="glow-button sm-btn alt">✏️ Edit Scope</button>
+                  <button id="scope-toggle-btn" class="icon-btn sm-btn" title="Toggle Panel">▲</button>
+                </div>
               </div>
-            </div>
-
-            <!-- Chat Input -->
-            <div class="chat-input-panel">
-              <div class="presets-row">
-                <button class="preset-tag" data-prompt="Show Hermes config settings">⚙️ Settings</button>
-                <button class="preset-tag" data-prompt="Explain what skills you have installed">📚 Skills</button>
-                <button class="preset-tag" data-prompt="Check the latest files in this project directory">📂 Scan Files</button>
-              </div>
-
-              <div class="input-form-container">
-                <textarea id="prompt-input" placeholder="Type a message to Hermes..." rows="1"></textarea>
-                
-                <div class="input-actions-bar">
-                  <div class="execution-options">
-                    <label class="checkbox-container">
-                      <input type="checkbox" id="stream-toggle" checked>
-                      <span class="checkmark"></span>
-                      <span class="label-text">Stream</span>
-                    </label>
-                    <div id="execution-status" class="execution-badge status-idle hidden">
-                      <span class="spinner-icon hidden"><svg class="spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle><path d="M12 2C6.47715 2 2 6.47715 2 12C2 13.5 2.5 15 3.5 16.2"></path></svg></span>
-                      <span class="badge-text">Idle</span>
-                    </div>
-                  </div>
-                  
-                  <button id="submit-btn" class="glow-button">
-                    <span>Send</span>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-                  </button>
+              <div id="scope-content-grid" class="scope-content-grid collapsed">
+                <div class="scope-card vision">
+                  <h5>Vision</h5>
+                  <p id="scope-vision-text">Loading...</p>
+                </div>
+                <div class="scope-card mission">
+                  <h5>Mission</h5>
+                  <p id="scope-mission-text">Loading...</p>
+                </div>
+                <div class="scope-card need">
+                  <h5>Need</h5>
+                  <p id="scope-need-text">Loading...</p>
+                </div>
+                <div class="scope-card want">
+                  <h5>Want</h5>
+                  <p id="scope-want-text">Loading...</p>
+                </div>
+                <div class="scope-card target-scope">
+                  <h5>Target Scope</h5>
+                  <p id="scope-target-text">Loading...</p>
                 </div>
               </div>
             </div>
-          </main>
-        </div>
-      </div>
 
-      <!-- View 2: Kanban Board (Hidden initially) -->
-      <div id="view-kanban" class="view-container hidden">
-        <div class="kanban-workspace">
-          <header class="kanban-header">
-            <div class="header-left">
-              <h2>Agent Workflow Kanban Board</h2>
-              <p class="subtitle">Drag cards between columns to trigger customized Hermes Agent processing.</p>
+            <div class="kanban-split-layout">
+              <!-- Board Columns Grid -->
+              <div id="kanban-board" class="kanban-board">
+                <!-- Columns are dynamically injected here -->
+              </div>
+
+              <!-- Project Planner Embedded Chat Drawer -->
+              <div id="project-planner-chat-drawer" class="project-planner-chat-drawer hidden">
+                <div class="planner-chat-header">
+                  <div class="planner-chat-title">
+                    <span>🤖 Project Architect & Team Recruiter</span>
+                    <small style="display:block; color:var(--text-muted); font-size:0.75rem; font-weight:400;">Chat to refine vision, scope, or hire team roles.</small>
+                  </div>
+                  <button id="planner-chat-close-btn" class="icon-btn sm-btn">❌</button>
+                </div>
+
+                <div id="planner-chat-messages" class="planner-chat-messages">
+                  <div class="planner-welcome-bubble">
+                    👋 <strong>Hello! I am your Project Architect Agent.</strong><br>
+                    I can help you plan and refine your project's Vision, Mission, Needs, Wants, and recruit specialized Agent roles for your team. What shall we plan today?
+                  </div>
+                </div>
+
+                <div class="planner-chat-input-panel">
+                  <div class="planner-presets-row">
+                    <button class="preset-tag sm-tag" id="planner-preset-scope">🎯 Refine Scope</button>
+                    <button class="preset-tag sm-tag" id="planner-preset-recruit">🤖 Recruit Team</button>
+                  </div>
+                  <div class="planner-input-box">
+                    <textarea id="planner-chat-input" placeholder="Ask Architect to update scope or recruit agents..." rows="2"></textarea>
+                    <button id="planner-chat-send-btn" class="glow-button sm-btn">Send</button>
+                    <button id="planner-chat-stop-btn" class="danger-btn sm-btn hidden" style="align-self:flex-end;">⏹️ Stop</button>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="header-right">
-              <div class="project-selector-container">
-                <span class="project-selector-label">Active Project:</span>
-                <select id="project-select" class="dropdown-select project-dropdown">
-                  <!-- Project options -->
-                </select>
-                <button id="project-add-btn" class="icon-btn" title="Create New Project">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          </div>
+        </div>
+
+        <!-- Subview 2: Full-Page Project Workspace Chat Interface (Embedded directly in Kanban Workspace) -->
+        <div id="kanban-chat-subview" class="kanban-subview hidden">
+          <div class="app-container" style="height: 100%;">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+              <div class="sidebar-header">
+                <h3>Sessions</h3>
+                <button id="new-task-btn" class="icon-btn" title="New Session">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <line x1="12" y1="5" x2="12" y2="19"></line>
                     <line x1="5" y1="12" x2="19" y2="12"></line>
                   </svg>
                 </button>
-                <button id="project-edit-btn" class="icon-btn" title="Manage Project" style="margin-left: 4px;">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="3"></circle>
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                  </svg>
-                </button>
               </div>
-              <button id="manage-agents-btn" class="glow-button" style="margin-right: 8px;">
-                <span>🤖 Roles</span>
-              </button>
-              <button id="add-column-btn" class="glow-button">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                <span>Add Column</span>
-              </button>
-            </div>
-          </header>
 
-          <!-- Board Columns Grid -->
-          <div id="kanban-board" class="kanban-board">
-            <!-- Columns are dynamically injected here -->
+              <div class="sidebar-section-title">
+                <span>PROJECT SESSIONS</span>
+                <button id="clear-history-btn" class="text-btn">Clear All</button>
+              </div>
+
+              <div id="history-list" class="history-list">
+                <div class="empty-history">No sessions for this project yet</div>
+              </div>
+
+              <div class="sidebar-footer">
+                <div class="status-badge active">
+                  <span class="pulse-dot"></span>
+                  <span>Workspace Active</span>
+                </div>
+              </div>
+            </aside>
+
+            <!-- Sidebar Overlay for mobile -->
+            <div id="sidebar-overlay" class="sidebar-overlay"></div>
+
+            <!-- Main Chat Panel -->
+            <main class="workspace">
+              <!-- Top navbar -->
+              <header class="workspace-header">
+                <div style="display: flex; align-items: center;">
+                  <button id="back-to-board-btn" class="glow-button sm-btn alt" style="margin-right: 14px;">
+                    <span>🔙 Back to Board</span>
+                  </button>
+                  <button id="sidebar-toggle" class="icon-btn sidebar-toggle-btn" title="Toggle History" style="margin-right: 10px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="3" y1="12" x2="21" y2="12"></line>
+                      <line x1="3" y1="6" x2="21" y2="6"></line>
+                      <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                  </button>
+                  <div class="header-left">
+                    <h1>Workspace Interactive Chat</h1>
+                    <p class="subtitle">Execute agent instructions inside current project directory.</p>
+                  </div>
+                </div>
+                
+                <div class="header-right">
+                  <div class="connection-status">
+                    <span class="status-label">Active Session:</span>
+                    <span id="session-badge" class="status-value highlight">New Session</span>
+                    <button id="reset-session-btn" class="icon-btn" title="Start New Session" style="width: 20px; height: 20px; border-radius: 4px; margin-left: 8px; border: none; background: rgba(255, 255, 255, 0.05); padding: 2px;">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </header>
+
+              <!-- Chat Messages -->
+              <div id="chat-messages" class="chat-messages">
+                <div class="welcome-container" id="welcome-container">
+                  <div class="welcome-icon">💬</div>
+                  <h2>Project Workspace Interactive Assistant</h2>
+                  <p>Submit instructions directly to Hermes in this workspace directory and see results in real-time.</p>
+                </div>
+              </div>
+
+              <!-- Chat Input -->
+              <div class="chat-input-panel">
+                <div class="presets-row">
+                  <button class="preset-tag" data-prompt="Show Hermes config settings">⚙️ Settings</button>
+                  <button class="preset-tag" data-prompt="Explain what skills you have installed">📚 Skills</button>
+                  <button class="preset-tag" data-prompt="Check the latest files in this project directory">📂 Scan Files</button>
+                  <button class="preset-tag plan-tag" id="preset-plan-scope" data-prompt="Plan project vision, mission, needs, wants and target scope for this project.">🎯 Plan Project Scope</button>
+                  <button class="preset-tag plan-tag" id="preset-recruit-team" data-prompt="Analyze project requirements and recruit missing team role agents by outputting [CREATE_AGENT: Role Name | System Prompt]">🤖 Recruit Team Roles</button>
+                </div>
+
+                <div class="input-form-container">
+                  <textarea id="prompt-input" placeholder="Type a message to Hermes..." rows="1"></textarea>
+                  
+                  <div class="input-actions-bar">
+                    <div class="execution-options">
+                      <label class="checkbox-container">
+                        <input type="checkbox" id="stream-toggle" checked>
+                        <span class="checkmark"></span>
+                        <span class="label-text">Stream</span>
+                      </label>
+                      <div id="execution-status" class="execution-badge status-idle hidden">
+                        <span class="spinner-icon hidden"><svg class="spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle><path d="M12 2C6.47715 2 2 6.47715 2 12C2 13.5 2.5 15 3.5 16.2"></path></svg></span>
+                        <span class="badge-text">Idle</span>
+                      </div>
+                    </div>
+                    
+                    <button id="submit-btn" class="glow-button">
+                      <span>Send</span>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                    </button>
+                    <button id="stop-btn" class="danger-btn hidden" style="margin-left: 8px; padding: 8px 16px;">
+                      <span>⏹️ Stop</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </main>
           </div>
         </div>
+
       </div>
 
       <!-- View 3: Settings (Hidden initially) -->
       <div id="view-config" class="view-container hidden">
-        <div class="settings-workspace">
-          <div class="settings-panel">
-            <div class="settings-header">
-              <h2>⚙️ System Settings</h2>
-              <p>Configure local binary and configuration paths for HermesCrew.</p>
-            </div>
+        <div class="app-container" style="max-width: 800px; margin: 0 auto; padding: 30px; overflow-y: auto;">
+          <div class="config-card">
+            <h2>System Configuration</h2>
+            <p class="subtitle">Configure local CLI runners and agent parameters.</p>
             
-            <div class="settings-form">
-              <div class="form-group">
-                <label for="input-hermes-path">Hermes Executable Path</label>
-                <div class="input-with-status">
-                  <input type="text" id="input-hermes-path" value="~/.local/bin/hermes" placeholder="e.g. ~/.local/bin/hermes or hermes">
-                  <span id="status-hermes-path" class="status-indicator">Checking...</span>
-                </div>
-                <small class="form-help">The path to the hermes command-line executable. Supports absolute paths or paths starting with <code>~/</code>.</small>
-              </div>
+            <div class="form-group" style="margin-top: 24px;">
+              <label for="input-hermes-path">Hermes CLI Executable Path</label>
+              <input type="text" id="input-hermes-path" placeholder="e.g. ~/.nvm/versions/node/v22.18.0/bin/hermes">
+              <p class="field-desc">Path to the hermes executable binary on your local system.</p>
+            </div>
 
-              <div class="form-group">
-                <label for="input-hermes-config-dir">Hermes Config Directory (.hermes)</label>
-                <div class="input-with-status">
-                  <input type="text" id="input-hermes-config-dir" value="~/.hermes" placeholder="e.g. ~/.hermes">
-                  <span id="status-hermes-config-dir" class="status-indicator">Checking...</span>
-                </div>
-                <small class="form-help">The directory where the Hermes agent stores its local settings and session data.</small>
-              </div>
+            <div class="form-group">
+              <label for="input-hermes-config-dir">Hermes Config Directory</label>
+              <input type="text" id="input-hermes-config-dir" placeholder="e.g. ~/.hermes">
+              <p class="field-desc">Location of your local hermes runtime configuration directory.</p>
+            </div>
 
-              <button id="save-config-btn" class="glow-button" style="margin-top: 10px; width: fit-content; padding: 12px 24px;">
-                <span>Save Settings</span>
-              </button>
+            <div style="margin-top: 30px; display: flex; justify-content: flex-end;">
+              <button id="save-config-btn" class="glow-button">Save Configuration</button>
             </div>
           </div>
         </div>
@@ -245,111 +320,127 @@
     </div>
   </div>
 
-  <!-- Column Config Modal -->
+  <!-- Column Configuration Modal -->
   <div id="column-modal" class="modal-overlay hidden">
     <div class="modal-card">
       <div class="modal-header">
-        <h3 id="column-modal-title">Column Configuration</h3>
+        <h3 id="column-modal-title">Configure Column</h3>
         <button class="icon-btn modal-close-btn" data-close-modal="column-modal">❌</button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="modal-col-id">
         <div class="form-group">
           <label for="modal-col-name">Column Name</label>
-          <input type="text" id="modal-col-name" placeholder="e.g. Analysis Group">
+          <input type="text" id="modal-col-name" placeholder="e.g. Code Review">
         </div>
         
-        <div class="form-group row-checkbox">
-          <label class="checkbox-container">
+        <div class="form-group">
+          <label class="checkbox-container" style="font-size: 0.9rem; color: #fff;">
             <input type="checkbox" id="modal-col-agent-enabled">
             <span class="checkmark"></span>
-            <span class="label-text">Enable Agent Auto-Processing (Hermes)</span>
+            <span>Enable Agent Processing on Card Drop</span>
           </label>
+          <p class="field-desc">When enabled, dropping a card into this column triggers Hermes Agent execution with the instructions below.</p>
         </div>
 
-
-        <div class="form-group" id="modal-col-prompt-container">
-          <label for="modal-col-prompt">Agent Prompt Template</label>
-          <p class="field-desc">This prompt template is run against the card contents when moved to this column. Add routing instructions like <code>[MOVE_TO: Done]</code> to let the agent auto-transition the card.</p>
-          <textarea id="modal-col-prompt" placeholder="Describe instructions for Hermes to process this card..." rows="6"></textarea>
+        <div id="modal-col-prompt-container" class="form-group hidden">
+          <label for="modal-col-prompt">Column Agent Instructions (Prompt)</label>
+          <p class="field-desc">Customized system prompt given to Hermes Agent when processing cards in this column.</p>
+          <textarea id="modal-col-prompt" placeholder="e.g. Review the task requirements, test execution results, and write unit tests..." rows="4"></textarea>
         </div>
       </div>
       <div class="modal-footer">
         <button id="modal-col-delete-btn" class="danger-btn">Delete Column</button>
-        <button id="modal-col-save-btn" class="glow-button">Save Settings</button>
+        <button id="modal-col-save-btn" class="glow-button">Save Column</button>
       </div>
     </div>
   </div>
 
-  <!-- Card Details / Edit / Comments Modal -->
+  <!-- Card Detail Modal -->
   <div id="card-modal" class="modal-overlay hidden">
     <div class="modal-card card-detail-modal">
       <div class="modal-header">
-        <div class="card-modal-header-title">
-          <span class="card-id-badge" id="modal-card-id-label">CARD-ID</span>
-          <h3 id="modal-card-title-text" contenteditable="true">Card Title</h3>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span id="modal-card-id-label" class="card-id-badge">CARD-1</span>
+          <h3 id="modal-card-title-text" style="margin: 0; font-size: 1.1rem;">Card Details</h3>
         </div>
         <button class="icon-btn modal-close-btn" data-close-modal="card-modal">❌</button>
       </div>
+
       <div class="modal-body card-modal-layout">
-        <!-- Left Pane: Card content -->
+        <!-- Main Content Pane -->
         <div class="modal-pane-left">
-          <div class="form-group">
-            <label>Description</label>
-            <div id="modal-card-desc-container" class="card-desc-editable">
-              <textarea id="modal-card-desc-input" placeholder="Add a detailed description for this card..." rows="4"></textarea>
-            </div>
-          </div>
-          
-          <div class="card-processing-status hidden" id="card-modal-processing-indicator">
+          <div id="card-modal-processing-indicator" class="execution-badge status-running hidden" style="margin-bottom: 15px; width: fit-content; align-items: center;">
             <span class="pulse-dot"></span>
-            <span>Hermes Agent is running in the background...</span>
+            <span>Agent is currently executing this card...</span>
+            <button id="modal-card-stop-execution-btn" class="danger-btn sm-btn" style="margin-left: 12px; padding: 2px 8px; font-size: 0.75rem;">⏹️ Stop Task</button>
           </div>
 
-          <!-- Comment Thread -->
           <div class="modal-comments-section">
-            <label>Discussion & Agent Output</label>
+            <h4 class="section-title">Discussion & Agent Activity Log</h4>
             <div id="modal-card-comments-list" class="modal-comments-list">
-              <!-- Comments are injected here -->
+              <!-- Comments injected here -->
             </div>
             
-            <div class="add-comment-container">
-              <textarea id="modal-new-comment-input" placeholder="Type a comment or ask Agent a follow-up..." rows="2"></textarea>
+            <div class="add-comment-container" style="position: relative;">
+              <textarea id="modal-new-comment-input" placeholder="Add a comment or reply to agent... (Use @ to mention roles)" rows="2"></textarea>
+              <div id="mention-autocomplete-dropdown" class="mention-autocomplete-dropdown hidden"></div>
               <div class="comment-action-bar">
-                <span class="field-desc">Agent outputs are saved here automatically.</span>
-                <button id="modal-add-comment-btn" class="glow-button">Add Comment</button>
+                <span class="text-muted" style="font-size: 0.75rem;">Tip: Type @ to mention team agents</span>
+                <button id="modal-add-comment-btn" class="glow-button sm-btn">Post Comment</button>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Right Pane: Actions & Info -->
+        <!-- Meta Sidebar Pane -->
         <div class="modal-pane-right">
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label for="modal-card-desc-input">Task Description & Instructions</label>
+            <textarea id="modal-card-desc-input" rows="4" placeholder="Task details..."></textarea>
+          </div>
+
           <div class="meta-section">
-            <h4>Quick Actions</h4>
+            <h4>Task Properties</h4>
+            
             <div class="meta-item">
               <span class="meta-label">Column:</span>
               <select id="modal-card-column-select" class="dropdown-select">
-                <!-- Column options injected here -->
+                <!-- Column options -->
               </select>
             </div>
+
             <div class="meta-item">
               <span class="meta-label">Session ID:</span>
               <span id="modal-card-session-badge" class="session-badge-value">None</span>
             </div>
             <div class="meta-item" style="flex-direction: column; align-items: stretch; gap: 6px; margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 14px;">
-              <span class="meta-label">Card Owner (当前拥有者):</span>
+              <span class="meta-label">Card Owner:</span>
               <select id="modal-card-owner-select" class="dropdown-select" style="width: 100%;">
-                <option value="unassigned">待领取 (Unassigned)</option>
-                <option value="user">用户 (User)</option>
+                <option value="unassigned">Unassigned</option>
+                <option value="user">User</option>
                 <!-- Agent options will be injected dynamically -->
               </select>
             </div>
             <div class="meta-item" style="flex-direction: column; align-items: stretch; gap: 6px; margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 14px;">
-              <span class="meta-label">Stakeholders (关注的 Agents):</span>
+              <span class="meta-label">Stakeholders (Watching Agents):</span>
               <div id="modal-card-watchers-list" style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px; max-height: 180px; overflow-y: auto;">
                 <!-- Checkboxes will be injected here dynamically -->
               </div>
+            </div>
+            <div class="meta-item" style="flex-direction: column; align-items: stretch; gap: 6px; margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 14px;">
+              <span class="meta-label">💬 Meeting Budget:</span>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span id="modal-card-budget-status" style="font-size: 0.85rem; color: var(--text-muted);">0 / 10 rounds</span>
+                <button id="modal-card-reset-budget-btn" class="text-btn" style="margin-left: auto;">Reset Budget</button>
+              </div>
+            </div>
+            <div class="meta-item" style="flex-direction: column; align-items: stretch; gap: 6px; margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="meta-label">📌 Sub-tasks (Created by Agent):</span>
+              </div>
+              <div id="modal-card-parent-link" style="font-size: 0.85rem; margin-top: 4px;"></div>
+              <div id="modal-card-subcards-list" style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px; max-height: 140px; overflow-y: auto;"></div>
             </div>
           </div>
 
@@ -480,6 +571,42 @@
     </div>
   </div>
 
-  <script src="app.js?v=1.0.9"></script>
+  <!-- Scope Edit Modal -->
+  <div id="scope-modal" class="modal-overlay hidden">
+    <div class="modal-card" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3>Edit Project Goals & Management Scope</h3>
+        <button class="icon-btn modal-close-btn" data-close-modal="scope-modal">❌</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="modal-scope-vision">Vision</label>
+          <textarea id="modal-scope-vision" rows="2" placeholder="Long-term inspirational vision..."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="modal-scope-mission">Mission</label>
+          <textarea id="modal-scope-mission" rows="2" placeholder="Actionable mission..."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="modal-scope-need">Need</label>
+          <textarea id="modal-scope-need" rows="2" placeholder="Key problems addressed..."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="modal-scope-want">Want</label>
+          <textarea id="modal-scope-want" rows="2" placeholder="Customer wants / feature capabilities..."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="modal-scope-target">Target Scope</label>
+          <textarea id="modal-scope-target" rows="2" placeholder="Milestone target scope..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="danger-btn" style="visibility: hidden;">Placeholder</button>
+        <button id="modal-scope-save-btn" class="glow-button">Save Project Scope</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=1.1.0"></script>
 </body>
 </html>

@@ -1137,8 +1137,10 @@ body {
 
 /* Card Details Modal Layout (Larger, Side-by-Side) */
 .card-detail-modal {
-  width: 800px;
-  max-width: 95%;
+  width: 1100px;
+  max-width: 95vw;
+  height: 88vh;
+  max-height: 900px;
 }
 
 .card-modal-header-title {
@@ -1177,15 +1179,16 @@ body {
   display: flex;
   gap: 24px;
   overflow: hidden;
-  max-height: 70vh;
+  flex: 1;
+  max-height: calc(88vh - 120px);
 }
 
 .modal-pane-left {
   flex: 2;
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
   padding-right: 8px;
 }
 
@@ -1196,7 +1199,8 @@ body {
   padding: 0 0 0 20px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  gap: 16px;
+  overflow-y: auto;
 }
 
 .card-desc-editable textarea {
@@ -1220,6 +1224,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex: 1;
+  overflow: hidden;
 }
 
 .modal-comments-list {
@@ -1227,7 +1233,9 @@ body {
   border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 14px;
-  max-height: 250px;
+  flex: 1;
+  min-height: 380px;
+  max-height: calc(88vh - 220px);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -1816,3 +1824,339 @@ body {
   font-size: 0.8rem;
   color: var(--secondary);
 }
+
+/* ==========================================
+   PROJECT SCOPE PANEL & MEETING ROOM STYLES
+   ========================================== */
+
+.project-scope-panel {
+  background: rgba(20, 20, 32, 0.75);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-radius: 14px;
+  margin: 16px 24px 8px 24px;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.scope-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.scope-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.scope-time-badge {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.scope-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sm-btn {
+  padding: 6px 12px !important;
+  font-size: 0.78rem !important;
+  border-radius: 6px !important;
+}
+
+.sm-btn.alt {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+.sm-btn.alt:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+}
+
+.scope-content-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.scope-content-grid.collapsed {
+  display: none !important;
+}
+
+.scope-card {
+  background: rgba(10, 10, 18, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 12px;
+  transition: border-color 0.2s ease;
+}
+
+.scope-card:hover {
+  border-color: rgba(168, 85, 247, 0.4);
+}
+
+.scope-card h5 {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.scope-card.vision h5 { color: #a855f7; }
+.scope-card.mission h5 { color: #00ffff; }
+.scope-card.need h5 { color: #f59e0b; }
+.scope-card.want h5 { color: #10b981; }
+.scope-card.target-scope h5 { color: #f43f5e; }
+
+.scope-card p {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Meeting Room Column Distinction */
+.kanban-column.meeting-column {
+  border: 1px solid rgba(0, 255, 255, 0.35) !important;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.08) !important;
+}
+
+.meeting-column .column-title {
+  color: #00ffff !important;
+}
+
+.meeting-column .column-agent-badge {
+  background-color: rgba(0, 255, 255, 0.15) !important;
+  color: #00ffff !important;
+  border-color: rgba(0, 255, 255, 0.4) !important;
+}
+
+.subcard-link-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.subcard-link-item:hover {
+  background: rgba(168, 85, 247, 0.1);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.preset-tag.plan-tag {
+  background: rgba(168, 85, 247, 0.15) !important;
+  border-color: rgba(168, 85, 247, 0.4) !important;
+  color: #d8b4fe !important;
+}
+
+.preset-tag.plan-tag:hover {
+  background: rgba(168, 85, 247, 0.3) !important;
+  color: #fff !important;
+}
+
+/* ==========================================
+   EMBEDDED PROJECT PLANNER CHAT DRAWER
+   ========================================== */
+
+.kanban-split-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.project-planner-chat-drawer {
+  width: 380px;
+  background: rgba(15, 15, 25, 0.95);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border-left: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.project-planner-chat-drawer.hidden {
+  display: none !important;
+}
+
+.planner-chat-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.planner-chat-title span {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #fff;
+}
+
+.planner-chat-messages {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.planner-welcome-bubble {
+  background: rgba(168, 85, 247, 0.08);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.planner-message {
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  max-width: 90%;
+}
+
+.planner-message.user {
+  background: rgba(6, 182, 212, 0.15);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  color: #fff;
+  align-self: flex-end;
+}
+
+.planner-message.agent {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  align-self: flex-start;
+}
+
+.planner-chat-input-panel {
+  padding: 14px;
+  border-top: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.planner-presets-row {
+  display: flex;
+  gap: 6px;
+}
+
+.sm-tag {
+  font-size: 0.72rem !important;
+  padding: 3px 8px !important;
+}
+
+.planner-input-box {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.planner-input-box textarea {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  resize: none;
+}
+
+.planner-input-box textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.ws-chat-history-container {
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.4);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ws-history-session-item {
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.ws-history-session-item:hover {
+  background: rgba(6, 182, 212, 0.15);
+  border-color: var(--secondary);
+  color: #fff;
+}
+
+.ws-history-session-item.active {
+  background: rgba(6, 182, 212, 0.25);
+  border-color: var(--secondary);
+  font-weight: 600;
+  color: #fff;
+}
+
+/* Subview Layout rules for Kanban Board & Full Chat switching */
+#view-kanban {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+}
+
+.kanban-subview {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.kanban-subview.hidden {
+  display: none !important;
+}
+
+

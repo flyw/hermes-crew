@@ -1,55 +1,50 @@
 document.addEventListener('DOMContentLoaded', () => {
   console.log('[Kanban Init] DOMContentLoaded event fired. Starting initialization...');
+  
+  // Project Workspace state (declared top-level for early access)
+  let currentProjectId = localStorage.getItem('kanban_current_project') || 'proj-default';
+
   // --- View switcher ---
-  const tabChat = document.getElementById('tab-chat');
   const tabKanban = document.getElementById('tab-kanban');
   const tabConfig = document.getElementById('tab-config');
-  const viewChat = document.getElementById('view-chat');
   const viewKanban = document.getElementById('view-kanban');
   const viewConfig = document.getElementById('view-config');
 
-  tabChat.addEventListener('click', () => {
-    tabChat.classList.add('active');
-    tabKanban.classList.remove('active');
-    tabConfig.classList.remove('active');
-    viewChat.classList.add('active');
-    viewChat.classList.remove('hidden');
-    viewKanban.classList.remove('active');
-    viewKanban.classList.add('hidden');
-    viewConfig.classList.remove('active');
-    viewConfig.classList.add('hidden');
-    stopKanbanPolling();
-  });
-
-  tabKanban.addEventListener('click', () => {
-    tabKanban.classList.add('active');
-    tabChat.classList.remove('active');
-    tabConfig.classList.remove('active');
-    viewKanban.classList.add('active');
-    viewKanban.classList.remove('hidden');
-    viewChat.classList.remove('active');
-    viewChat.classList.add('hidden');
-    viewConfig.classList.remove('active');
-    viewConfig.classList.add('hidden');
-    startKanbanPolling();
-    fetchProjects().then(() => {
-      fetchKanbanBoard();
+  if (tabKanban) {
+    tabKanban.addEventListener('click', () => {
+      tabKanban.classList.add('active');
+      if (tabConfig) tabConfig.classList.remove('active');
+      if (viewKanban) {
+        viewKanban.classList.add('active');
+        viewKanban.classList.remove('hidden');
+      }
+      if (viewConfig) {
+        viewConfig.classList.remove('active');
+        viewConfig.classList.add('hidden');
+      }
+      startKanbanPolling();
+      fetchProjects().then(() => {
+        fetchKanbanBoard();
+      });
     });
-  });
+  }
 
-  tabConfig.addEventListener('click', () => {
-    tabConfig.classList.add('active');
-    tabChat.classList.remove('active');
-    tabKanban.classList.remove('active');
-    viewConfig.classList.add('active');
-    viewConfig.classList.remove('hidden');
-    viewChat.classList.remove('active');
-    viewChat.classList.add('hidden');
-    viewKanban.classList.remove('active');
-    viewKanban.classList.add('hidden');
-    stopKanbanPolling();
-    loadConfig();
-  });
+  if (tabConfig) {
+    tabConfig.addEventListener('click', () => {
+      tabConfig.classList.add('active');
+      if (tabKanban) tabKanban.classList.remove('active');
+      if (viewConfig) {
+        viewConfig.classList.add('active');
+        viewConfig.classList.remove('hidden');
+      }
+      if (viewKanban) {
+        viewKanban.classList.remove('active');
+        viewKanban.classList.add('hidden');
+      }
+      stopKanbanPolling();
+      loadConfig();
+    });
+  }
 
   // --- Chat Assistant Workspace Logic ---
   const promptInput = document.getElementById('prompt-input');
@@ -89,6 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   promptInput.addEventListener('keydown', (e) => {
+    if (e.isComposing || e.keyCode === 229) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       executeTask();
@@ -136,10 +132,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  sidebarToggle.addEventListener('click', () => {
-    sidebar.classList.toggle('open');
-    sidebarOverlay.classList.toggle('open');
-  });
+  if (sidebarToggle) {
+    sidebarToggle.addEventListener('click', () => {
+      if (sidebar) sidebar.classList.toggle('open');
+      if (sidebarOverlay) sidebarOverlay.classList.toggle('open');
+    });
+  }
 
   sidebarOverlay.addEventListener('click', closeSidebarOnMobile);
 
@@ -225,6 +223,10 @@ document.addEventListener('DOMContentLoaded', () => {
     setStatus('running');
     closeSidebarOnMobile();
 
+    const stopBtn = document.getElementById('stop-btn');
+    if (submitBtn) submitBtn.classList.add('hidden');
+    if (stopBtn) stopBtn.classList.remove('hidden');
+
     const useStreaming = streamToggle.checked;
 
     if (useStreaming) {
@@ -273,7 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function streamExecution(prompt, agentBubble) {
     if (activeEventSource) activeEventSource.close();
 
-    let url = `/api/run-stream?prompt=${encodeURIComponent(prompt)}`;
+    let url = `/api/run-stream?prompt=${encodeURIComponent(prompt)}&projectId=${encodeURIComponent(currentProjectId)}`;
     if (currentSessionId) {
       url += `&sessionId=${encodeURIComponent(currentSessionId)}`;
     }
@@ -355,6 +357,7 @@ document.addEventListener('DOMContentLoaded', () => {
         errorContainer.classList.remove('hidden');
         errorText.textContent = `Execution Error: ${data.error}`;
       }
+      resetChatButtons();
     };
   }
 
@@ -380,7 +383,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const response = await fetch('/api/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, sessionId: currentSessionId })
+        body: JSON.stringify({ prompt, sessionId: currentSessionId, projectId: currentProjectId })
       });
 
       const data = await response.json();
@@ -423,12 +426,40 @@ document.addEventListener('DOMContentLoaded', () => {
       errorContainer.classList.remove('hidden');
       errorText.textContent = `Network Error: ${err.message}`;
       agentBubble.removeAttribute('id');
+    } finally {
+      resetChatButtons();
     }
   }
 
+  function resetChatButtons() {
+    const stopBtn = document.getElementById('stop-btn');
+    if (submitBtn) submitBtn.classList.remove('hidden');
+    if (stopBtn) stopBtn.classList.add('hidden');
+  }
+
+  const globalStopBtn = document.getElementById('stop-btn');
+  if (globalStopBtn) {
+    globalStopBtn.addEventListener('click', async () => {
+      if (activeEventSource) activeEventSource.close();
+      if (timerInterval) clearInterval(timerInterval);
+      setStatus('idle');
+      resetChatButtons();
+      try {
+        await fetch('/api/stop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId: currentProjectId })
+        });
+      } catch (err) {
+        console.error('Failed to stop execution:', err);
+      }
+    });
+  }
+
   async function loadHistory() {
+    if (!currentProjectId) return;
     try {
-      const response = await fetch('/api/history');
+      const response = await fetch(`/api/history?projectId=${encodeURIComponent(currentProjectId)}`);
       if (!response.ok) return;
       activeHistory = await response.json();
       renderSidebarHistory();
@@ -585,7 +616,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let workspaceAgents = [];
   
   // Project Workspace state
-  let currentProjectId = localStorage.getItem('kanban_current_project') || 'proj-default';
   let projectsList = [];
 
   // DOM Modals & Triggers
@@ -668,8 +698,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const cardOwnerSelect = document.getElementById('modal-card-owner-select');
       if (cardOwnerSelect) {
         cardOwnerSelect.innerHTML = `
-          <option value="unassigned">待领取 (Unassigned)</option>
-          <option value="user">用户 (User)</option>
+          <option value="unassigned">Unassigned</option>
+          <option value="user">User</option>
         `;
         workspaceAgents.forEach(agent => {
           const option = document.createElement('option');
@@ -683,9 +713,314 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // --- Project Scope API Calls ---
+  let projectScopeData = {};
+
+  async function fetchProjectScope() {
+    if (!currentProjectId) return;
+    try {
+      const res = await fetch(`/api/kanban/scope?projectId=${encodeURIComponent(currentProjectId)}`);
+      if (!res.ok) return;
+      projectScopeData = await res.json();
+      renderProjectScope();
+    } catch (err) {
+      console.error('Failed to fetch project scope:', err);
+    }
+  }
+
+  function renderProjectScope() {
+    const v = document.getElementById('scope-vision-text');
+    const m = document.getElementById('scope-mission-text');
+    const n = document.getElementById('scope-need-text');
+    const w = document.getElementById('scope-want-text');
+    const t = document.getElementById('scope-target-text');
+    const lu = document.getElementById('scope-last-updated');
+
+    if (v) v.textContent = projectScopeData.vision || '(Not defined yet)';
+    if (m) m.textContent = projectScopeData.mission || '(Not defined yet)';
+    if (n) n.textContent = projectScopeData.need || '(Not defined yet)';
+    if (w) w.textContent = projectScopeData.want || '(Not defined yet)';
+    if (t) t.textContent = projectScopeData.targetScope || '(Not defined yet)';
+    if (lu && projectScopeData.lastUpdated) {
+      lu.textContent = 'Updated ' + new Date(projectScopeData.lastUpdated).toLocaleTimeString();
+    }
+  }
+
+  // Scope UI Event Listeners
+  const scopeToggleBtn = document.getElementById('scope-toggle-btn');
+  const scopeContentGrid = document.getElementById('scope-content-grid');
+  const scopeEditBtn = document.getElementById('scope-edit-btn');
+  const scopeAutoBtn = document.getElementById('scope-auto-btn');
+  const modalScopeSaveBtn = document.getElementById('modal-scope-save-btn');
+
+  if (scopeToggleBtn && scopeContentGrid) {
+    scopeToggleBtn.addEventListener('click', () => {
+      scopeContentGrid.classList.toggle('collapsed');
+      scopeToggleBtn.textContent = scopeContentGrid.classList.contains('collapsed') ? '▲' : '▼';
+    });
+  }
+
+  if (scopeEditBtn) {
+    scopeEditBtn.addEventListener('click', () => {
+      document.getElementById('modal-scope-vision').value = projectScopeData.vision || '';
+      document.getElementById('modal-scope-mission').value = projectScopeData.mission || '';
+      document.getElementById('modal-scope-need').value = projectScopeData.need || '';
+      document.getElementById('modal-scope-want').value = projectScopeData.want || '';
+      document.getElementById('modal-scope-target').value = projectScopeData.targetScope || '';
+      openModal('scope-modal');
+    });
+  }
+
+  if (modalScopeSaveBtn) {
+    modalScopeSaveBtn.addEventListener('click', async () => {
+      const vision = document.getElementById('modal-scope-vision').value.trim();
+      const mission = document.getElementById('modal-scope-mission').value.trim();
+      const need = document.getElementById('modal-scope-need').value.trim();
+      const want = document.getElementById('modal-scope-want').value.trim();
+      const targetScope = document.getElementById('modal-scope-target').value.trim();
+
+      try {
+        const res = await fetch(`/api/kanban/scope?projectId=${encodeURIComponent(currentProjectId)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ vision, mission, need, want, targetScope })
+        });
+        if (res.ok) {
+          projectScopeData = await res.json();
+          renderProjectScope();
+          closeModal('scope-modal');
+        }
+      } catch (err) {
+        console.error('Error saving project scope:', err);
+      }
+    });
+  }
+
+  if (scopeAutoBtn) {
+    scopeAutoBtn.addEventListener('click', async () => {
+      scopeAutoBtn.disabled = true;
+      scopeAutoBtn.textContent = '⏳ AI Synthesizing...';
+      try {
+        const res = await fetch(`/api/kanban/scope/auto-update?projectId=${encodeURIComponent(currentProjectId)}`, {
+          method: 'POST'
+        });
+        if (res.ok) {
+          const data = await res.json();
+          projectScopeData = data.scope;
+          renderProjectScope();
+        } else {
+          alert('Failed to auto-update scope with AI.');
+        }
+      } catch (err) {
+        console.error('Error auto-updating scope:', err);
+      } finally {
+        scopeAutoBtn.disabled = false;
+        scopeAutoBtn.textContent = '🤖 AI Auto-Update Scope';
+      }
+    });
+  }
+
+  // --- Embedded Project Planner Chat Drawer Logic ---
+  const projectChatToggleBtn = document.getElementById('project-chat-toggle-btn');
+  const projectPlannerChatDrawer = document.getElementById('project-planner-chat-drawer');
+  const plannerChatCloseBtn = document.getElementById('planner-chat-close-btn');
+  const plannerChatMessages = document.getElementById('planner-chat-messages');
+  const plannerChatInput = document.getElementById('planner-chat-input');
+  const plannerChatSendBtn = document.getElementById('planner-chat-send-btn');
+  const plannerPresetScope = document.getElementById('planner-preset-scope');
+  const plannerPresetRecruit = document.getElementById('planner-preset-recruit');
+
+  let currentPlannerSessionId = null;
+
+  if (projectChatToggleBtn && projectPlannerChatDrawer) {
+    projectChatToggleBtn.addEventListener('click', () => {
+      projectPlannerChatDrawer.classList.toggle('hidden');
+    });
+  }
+
+  if (plannerChatCloseBtn && projectPlannerChatDrawer) {
+    plannerChatCloseBtn.addEventListener('click', () => {
+      projectPlannerChatDrawer.classList.add('hidden');
+    });
+  }
+
+  if (plannerPresetScope && plannerChatInput) {
+    plannerPresetScope.addEventListener('click', () => {
+      plannerChatInput.value = "Please analyze our current project scope and suggest updates for Vision, Mission, Need, Want, or Target Scope.";
+      plannerChatInput.focus();
+    });
+  }
+
+  if (plannerPresetRecruit && plannerChatInput) {
+    plannerPresetRecruit.addEventListener('click', () => {
+      plannerChatInput.value = "Analyze our project requirements and recommend appropriate specialized Agent roles to recruit for our team using [CREATE_AGENT: Role Name | System Prompt].";
+      plannerChatInput.focus();
+    });
+  }
+
+  async function sendPlannerMessage() {
+    const text = plannerChatInput.value.trim();
+    if (!text || !currentProjectId) return;
+
+    plannerChatInput.value = '';
+
+    // Append user bubble
+    const userBubble = document.createElement('div');
+    userBubble.className = 'planner-message user';
+    userBubble.textContent = text;
+    plannerChatMessages.appendChild(userBubble);
+
+    // Append agent loading bubble
+    const agentBubble = document.createElement('div');
+    agentBubble.className = 'planner-message agent';
+    agentBubble.innerHTML = '<span class="pulse-dot"></span> <em>Architect thinking...</em>';
+    plannerChatMessages.appendChild(agentBubble);
+    plannerChatMessages.scrollTop = plannerChatMessages.scrollHeight;
+
+    // Build Architect system prompt context
+    const activeProj = projectsList.find(p => p.id === currentProjectId) || { name: 'Current Project' };
+    const teamRolesStr = workspaceAgents.map(a => `- **${a.name}**: ${a.prompt}`).join('\n');
+
+    const fullPrompt = `
+[SYSTEM INSTRUCTION: PROJECT ARCHITECT & TEAM RECRUITER AGENT]
+You are the Senior Project Architect & Team Recruiter AI for the project workspace: "${activeProj.name}".
+Your primary responsibilities are:
+1. Help the user plan, analyze, and refine project Management Terms: Vision, Mission, Need, Want, and Target Scope.
+2. Analyze project technical requirements and recruit appropriate team role agents into the workspace.
+
+[CURRENT PROJECT SCOPE]
+Vision: ${projectScopeData.vision || ''}
+Mission: ${projectScopeData.mission || ''}
+Need: ${projectScopeData.need || ''}
+Want: ${projectScopeData.want || ''}
+Target Scope: ${projectScopeData.targetScope || ''}
+
+[CURRENT TEAM ROLES IN WORKSPACE]
+${teamRolesStr}
+
+[DIRECTIVE TAG INSTRUCTIONS]
+If you agree with the user to update any project management term, you MUST output the corresponding directive tag:
+- [SET_VISION: New Vision text]
+- [SET_MISSION: New Mission text]
+- [SET_NEED: New Need text]
+- [SET_WANT: New Want text]
+- [SET_TARGET_SCOPE: New Target Scope text]
+
+If you recommend or recruit new team agent roles, you MUST output:
+- [CREATE_AGENT: Role Name | System Prompt Defining Role Persona and Instructions]
+
+[USER MESSAGE]
+${text}
+`;
+
+    const plannerChatStopBtn = document.getElementById('planner-chat-stop-btn');
+    if (plannerChatSendBtn) plannerChatSendBtn.classList.add('hidden');
+    if (plannerChatStopBtn) plannerChatStopBtn.classList.remove('hidden');
+
+    let url = `/api/run-stream?prompt=${encodeURIComponent(fullPrompt)}&projectId=${encodeURIComponent(currentProjectId)}`;
+    if (currentPlannerSessionId) {
+      url += `&sessionId=${encodeURIComponent(currentPlannerSessionId)}`;
+    }
+
+    if (window.activePlannerEventSource) window.activePlannerEventSource.close();
+    const plannerEventSource = new EventSource(url);
+    window.activePlannerEventSource = plannerEventSource;
+
+    let plannerOutputText = '';
+
+    plannerEventSource.onmessage = async (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'session_id') {
+        currentPlannerSessionId = data.sessionId;
+      } else if (data.type === 'stdout') {
+        if (plannerOutputText === '') agentBubble.innerHTML = '';
+        plannerOutputText += data.chunk;
+        agentBubble.innerHTML = marked.parse(plannerOutputText);
+        plannerChatMessages.scrollTop = plannerChatMessages.scrollHeight;
+      } else if (data.type === 'close') {
+        plannerEventSource.close();
+        window.activePlannerEventSource = null;
+        if (plannerChatSendBtn) plannerChatSendBtn.classList.remove('hidden');
+        if (plannerChatStopBtn) plannerChatStopBtn.classList.add('hidden');
+        await fetchKanbanBoard();
+        await fetchWorkspaceAgents();
+        await fetchProjectScope();
+      } else if (data.type === 'error') {
+        plannerEventSource.close();
+        window.activePlannerEventSource = null;
+        agentBubble.innerHTML = `<span style="color:var(--error);">Error: ${escapeHtml(data.error)}</span>`;
+        if (plannerChatSendBtn) plannerChatSendBtn.classList.remove('hidden');
+        if (plannerChatStopBtn) plannerChatStopBtn.classList.add('hidden');
+      }
+    };
+  }
+
+  const plannerChatStopBtn = document.getElementById('planner-chat-stop-btn');
+  if (plannerChatStopBtn) {
+    plannerChatStopBtn.addEventListener('click', async () => {
+      if (window.activePlannerEventSource) {
+        window.activePlannerEventSource.close();
+        window.activePlannerEventSource = null;
+      }
+      if (plannerChatSendBtn) plannerChatSendBtn.classList.remove('hidden');
+      if (plannerChatStopBtn) plannerChatStopBtn.classList.add('hidden');
+      try {
+        await fetch('/api/stop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId: currentProjectId })
+        });
+      } catch (err) {
+        console.error('Failed to stop planner execution:', err);
+      }
+    });
+  }
+
+  if (plannerChatSendBtn) {
+    plannerChatSendBtn.addEventListener('click', sendPlannerMessage);
+  }
+
+  if (plannerChatInput) {
+    plannerChatInput.addEventListener('keydown', (e) => {
+      if (e.isComposing || e.keyCode === 229) return;
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendPlannerMessage();
+      }
+    });
+  }
+
+  // --- Full-Page Workspace Chat Subview Switching Logic ---
+  const openFullChatBtn = document.getElementById('open-full-chat-btn');
+  const backToBoardBtn = document.getElementById('back-to-board-btn');
+  const kanbanBoardSubview = document.getElementById('kanban-board-subview');
+  const kanbanChatSubview = document.getElementById('kanban-chat-subview');
+
+  if (openFullChatBtn) {
+    openFullChatBtn.addEventListener('click', () => {
+      if (kanbanBoardSubview && kanbanChatSubview) {
+        kanbanBoardSubview.classList.add('hidden');
+        kanbanChatSubview.classList.remove('hidden');
+        loadHistory();
+      }
+    });
+  }
+
+  if (backToBoardBtn) {
+    backToBoardBtn.addEventListener('click', () => {
+      if (kanbanBoardSubview && kanbanChatSubview) {
+        kanbanChatSubview.classList.add('hidden');
+        kanbanBoardSubview.classList.remove('hidden');
+      }
+    });
+  }
+
   // Project selection change handler
   projectSelect.addEventListener('change', (e) => {
     currentProjectId = e.target.value;
+    currentPlannerSessionId = null;
+    currentWsSessionId = null;
+    if (wsChatSessionBadge) wsChatSessionBadge.textContent = 'New Session';
     localStorage.setItem('kanban_current_project', currentProjectId);
     console.log(`Switching workspace project to: ${currentProjectId}`);
     
@@ -693,6 +1028,7 @@ document.addEventListener('DOMContentLoaded', () => {
     closeModal('card-modal');
     closeModal('column-modal');
     
+    fetchProjectScope();
     fetchKanbanBoard();
   });
 
@@ -822,6 +1158,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!currentProjectId) return;
     try {
       await fetchWorkspaceAgents();
+      await fetchProjectScope();
       const response = await fetch(`/api/kanban?projectId=${encodeURIComponent(currentProjectId)}`);
       if (!response.ok) return;
       const data = await response.json();
@@ -876,7 +1213,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     kanbanColumns.forEach(column => {
       const colDiv = document.createElement('div');
-      colDiv.className = 'kanban-column';
+      const isMeeting = column.isMeetingRoom || column.name === 'Meeting Room' || column.name.toLowerCase().includes('meeting');
+      colDiv.className = 'kanban-column' + (isMeeting ? ' meeting-column' : '');
       colDiv.id = column.id;
       colDiv.draggable = true;
 
@@ -938,6 +1276,13 @@ document.addEventListener('DOMContentLoaded', () => {
              </div>`
           : '';
 
+        const budgetBadge = (isMeeting || (card.meetingRounds && card.meetingRounds > 0))
+          ? `<span style="font-size:0.7rem; color:var(--warning); margin-left:6px;">💬 ${card.meetingRounds || 0}/${card.maxBudget || 10}</span>`
+          : '';
+        const subcardBadge = (card.subCardIds && card.subCardIds.length > 0)
+          ? `<span style="font-size:0.7rem; color:var(--primary); margin-left:6px;">📌 ${card.subCardIds.length}</span>`
+          : '';
+
         // Dropdown move choices (touch support)
         let moveOptionsHtml = `<option value="" disabled selected>Move...</option>`;
         kanbanColumns.forEach(c => {
@@ -951,7 +1296,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="kanban-card-desc">${escapeHtml(card.description || 'No description.')}</div>
           ${summaryHtml}
           <div class="kanban-card-footer">
-            <span class="card-footer-comments">💬 ${commentsCount}</span>
+            <span class="card-footer-comments">💬 ${commentsCount}${budgetBadge}${subcardBadge}</span>
             <span class="card-footer-status">${processingHtml}</span>
           </div>
           
@@ -1184,6 +1529,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const modalCardColumnSelect = document.getElementById('modal-card-column-select');
   const modalCardSessionBadge = document.getElementById('modal-card-session-badge');
   const modalCardDeleteBtn = document.getElementById('modal-card-delete-btn');
+  const modalCardStopExecutionBtn = document.getElementById('modal-card-stop-execution-btn');
+
+  if (modalCardStopExecutionBtn) {
+    modalCardStopExecutionBtn.addEventListener('click', async () => {
+      if (!activeDetailCardId || !currentProjectId) return;
+      try {
+        await fetch('/api/stop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId: currentProjectId, cardId: activeDetailCardId })
+        });
+        await fetchKanbanBoard();
+      } catch (err) {
+        console.error('Failed to stop card execution:', err);
+      }
+    });
+  }
 
   // Card Owner & Watchers Bindings
   const modalCardOwnerSelect = document.getElementById('modal-card-owner-select');
@@ -1240,6 +1602,51 @@ document.addEventListener('DOMContentLoaded', () => {
       modalCardWatchersList.appendChild(itemDiv);
     });
 
+    // Populate Meeting Budget Status
+    const budgetStatusSpan = document.getElementById('modal-card-budget-status');
+    if (budgetStatusSpan) {
+      budgetStatusSpan.textContent = `${card.meetingRounds || 0} / ${card.maxBudget || 10} rounds`;
+    }
+
+    // Render Parent Card Link
+    const parentLinkContainer = document.getElementById('modal-card-parent-link');
+    if (parentLinkContainer) {
+      if (card.parentCardId) {
+        const parentCard = kanbanCards.find(c => c.id === card.parentCardId);
+        parentLinkContainer.innerHTML = `<span style="color:var(--text-muted);">Parent:</span> <a href="#" id="parent-card-click-link" style="color:var(--secondary); font-weight:600; text-decoration:underline;">${parentCard ? escapeHtml(parentCard.title) : card.parentCardId}</a>`;
+        const pLink = document.getElementById('parent-card-click-link');
+        if (pLink) {
+          pLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (parentCard) openCardDetailModal(parentCard);
+          });
+        }
+      } else {
+        parentLinkContainer.innerHTML = '<span style="color:var(--text-muted); font-size:0.78rem;">None (Standalone Task)</span>';
+      }
+    }
+
+    // Render Subcards List
+    const subcardsContainer = document.getElementById('modal-card-subcards-list');
+    if (subcardsContainer) {
+      subcardsContainer.innerHTML = '';
+      if (card.subCardIds && card.subCardIds.length > 0) {
+        card.subCardIds.forEach(subId => {
+          const subCard = kanbanCards.find(c => c.id === subId);
+          const itemDiv = document.createElement('div');
+          itemDiv.className = 'subcard-link-item';
+          const subCol = subCard ? kanbanColumns.find(col => col.id === subCard.columnId) : null;
+          itemDiv.innerHTML = `<span>📌 ${subCard ? escapeHtml(subCard.title) : subId}</span><span style="font-size:0.7rem; color:var(--text-muted);">${subCol ? subCol.name : ''}</span>`;
+          itemDiv.addEventListener('click', () => {
+            if (subCard) openCardDetailModal(subCard);
+          });
+          subcardsContainer.appendChild(itemDiv);
+        });
+      } else {
+        subcardsContainer.innerHTML = '<div style="font-size:0.78rem; color:var(--text-muted);">No sub-tasks yet.</div>';
+      }
+    }
+
     // Load columns dropdown list
     modalCardColumnSelect.innerHTML = '';
     kanbanColumns.forEach(col => {
@@ -1278,6 +1685,39 @@ document.addEventListener('DOMContentLoaded', () => {
     // If card.comments.length === renderedBubbles.length, we do absolutely nothing!
     cardModalJustOpened = false;
     initMentionAutocomplete();
+  }
+
+  // Budget Reset & Add Subcard Button Listeners
+  const resetBudgetBtn = document.getElementById('modal-card-reset-budget-btn');
+  if (resetBudgetBtn) {
+    resetBudgetBtn.addEventListener('click', async () => {
+      if (activeDetailCardId) {
+        await updateCardFields(activeDetailCardId, { meetingRounds: 0 });
+        fetchKanbanBoard();
+      }
+    });
+  }
+
+  const addSubcardBtn = document.getElementById('modal-card-add-subcard-btn');
+  if (addSubcardBtn) {
+    addSubcardBtn.addEventListener('click', async () => {
+      if (!activeDetailCardId) return;
+      const title = prompt("Enter sub-task title:");
+      if (!title || !title.trim()) return;
+      const description = prompt("Enter sub-task description (optional):") || "";
+      try {
+        const response = await fetch(`/api/kanban/cards/${activeDetailCardId}/subcards?projectId=${encodeURIComponent(currentProjectId)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: title.trim(), description: description.trim() })
+        });
+        if (response.ok) {
+          fetchKanbanBoard();
+        }
+      } catch (err) {
+        console.error('Error creating subcard:', err);
+      }
+    });
   }
 
   // Helper to append a single comment bubble
@@ -1858,11 +2298,12 @@ document.addEventListener('DOMContentLoaded', () => {
     saveConfigBtn.addEventListener('click', saveConfig);
   }
 
-  // Initialize Autocomplete at startup
-  initMentionAutocomplete();
-
-  // Export functions to global scope for nav clicks
-  window.loadConfig = loadConfig;
+  // Initial startup execution
+  startKanbanPolling();
+  fetchProjects().then(() => {
+    fetchKanbanBoard();
+    loadHistory();
+  });
 
   console.log('[Kanban Init] Initialization finished successfully!');
 });
