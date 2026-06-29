@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local state & registries (automatically initialized by server.js if missing)
+projects.json
+history.json
+kanban.json
+
+# Local test projects / scratch files
+weather_app_project/
+weather_check.py
+
+# OS metadata
+.DS_Store
+Thumbs.db

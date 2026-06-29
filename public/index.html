@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HermesCrew - Multi-Agent Workspace</title>
+  <!-- Google Fonts: Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Marked.js for Markdown parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- Highlight.js for code styling -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link rel="stylesheet" href="style.css?v=1.0.4">
+</head>
+<body>
+  <div class="portal-container">
+    <!-- Top Portal Header -->
+    <header class="portal-header">
+      <div class="logo">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L2 22H22L12 2Z" stroke="url(#logo-grad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M12 18V9" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+          <path d="M12 6H12.01" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+          <defs>
+            <linearGradient id="logo-grad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#a855f7"/>
+              <stop offset="1" stop-color="#00ffff"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <span>HERMES CREW</span>
+      </div>
+      
+      <!-- Tab Swapper -->
+      <nav class="portal-tabs">
+        <button id="tab-chat" class="tab-btn active">💬 Chat Workspace</button>
+        <button id="tab-kanban" class="tab-btn">📋 Kanban Board</button>
+      </nav>
+
+      <div class="portal-header-right">
+        <div class="connection-status">
+          <span class="status-label">Agent Node:</span>
+          <span class="status-value highlight">Online</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Content Workspace -->
+    <div class="portal-body">
+      
+      <!-- View 1: Chat Workspace (Default) -->
+      <div id="view-chat" class="view-container active">
+        <div class="app-container">
+          <!-- Sidebar -->
+          <aside class="sidebar">
+            <div class="sidebar-header">
+              <h3>Sessions</h3>
+              <button id="new-task-btn" class="icon-btn" title="New Session">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+              </button>
+            </div>
+
+            <div class="sidebar-section-title">
+              <span>CONVERSATIONS</span>
+              <button id="clear-history-btn" class="text-btn">Clear All</button>
+            </div>
+
+            <div id="history-list" class="history-list">
+              <div class="empty-history">No sessions yet</div>
+            </div>
+
+            <div class="sidebar-footer">
+              <div class="status-badge active">
+                <span class="pulse-dot"></span>
+                <span>Workspace Active</span>
+              </div>
+            </div>
+          </aside>
+
+          <!-- Sidebar Overlay for mobile -->
+          <div id="sidebar-overlay" class="sidebar-overlay"></div>
+
+          <!-- Main Chat Panel -->
+          <main class="workspace">
+            <!-- Top navbar -->
+            <header class="workspace-header">
+              <div style="display: flex; align-items: center;">
+                <button id="sidebar-toggle" class="icon-btn sidebar-toggle-btn" title="Toggle History">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                  </svg>
+                </button>
+                <div class="header-left">
+                  <h1>Hermes Chat</h1>
+                  <p class="subtitle">Execute agent instructions programmatically.</p>
+                </div>
+              </div>
+              
+              <div class="header-right">
+                <div class="connection-status">
+                  <span class="status-label">Active Session:</span>
+                  <span id="session-badge" class="status-value highlight">New Session</span>
+                  <button id="reset-session-btn" class="icon-btn" title="Start New Session" style="width: 20px; height: 20px; border-radius: 4px; margin-left: 8px; border: none; background: rgba(255, 255, 255, 0.05); padding: 2px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </header>
+
+            <!-- Chat Messages -->
+            <div id="chat-messages" class="chat-messages">
+              <div class="welcome-container" id="welcome-container">
+                <div class="welcome-icon">💬</div>
+                <h2>Interactive Chat Assistant</h2>
+                <p>Submit instructions directly to Hermes and see results in real-time.</p>
+              </div>
+            </div>
+
+            <!-- Chat Input -->
+            <div class="chat-input-panel">
+              <div class="presets-row">
+                <button class="preset-tag" data-prompt="Show Hermes config settings">⚙️ Settings</button>
+                <button class="preset-tag" data-prompt="Explain what skills you have installed">📚 Skills</button>
+                <button class="preset-tag" data-prompt="Check the latest files in this project directory">📂 Scan Files</button>
+              </div>
+
+              <div class="input-form-container">
+                <textarea id="prompt-input" placeholder="Type a message to Hermes..." rows="1"></textarea>
+                
+                <div class="input-actions-bar">
+                  <div class="execution-options">
+                    <label class="checkbox-container">
+                      <input type="checkbox" id="stream-toggle" checked>
+                      <span class="checkmark"></span>
+                      <span class="label-text">Stream</span>
+                    </label>
+                    <div id="execution-status" class="execution-badge status-idle hidden">
+                      <span class="spinner-icon hidden"><svg class="spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle><path d="M12 2C6.47715 2 2 6.47715 2 12C2 13.5 2.5 15 3.5 16.2"></path></svg></span>
+                      <span class="badge-text">Idle</span>
+                    </div>
+                  </div>
+                  
+                  <button id="submit-btn" class="glow-button">
+                    <span>Send</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+
+      <!-- View 2: Kanban Board (Hidden initially) -->
+      <div id="view-kanban" class="view-container hidden">
+        <div class="kanban-workspace">
+          <header class="kanban-header">
+            <div class="header-left">
+              <h2>Agent Workflow Kanban Board</h2>
+              <p class="subtitle">Drag cards between columns to trigger customized Hermes Agent processing.</p>
+            </div>
+            <div class="header-right">
+              <div class="project-selector-container">
+                <span class="project-selector-label">Active Project:</span>
+                <select id="project-select" class="dropdown-select project-dropdown">
+                  <!-- Project options -->
+                </select>
+                <button id="project-add-btn" class="icon-btn" title="Create New Project">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                </button>
+                <button id="project-edit-btn" class="icon-btn" title="Manage Project" style="margin-left: 4px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                  </svg>
+                </button>
+              </div>
+              <button id="manage-agents-btn" class="glow-button" style="margin-right: 8px;">
+                <span>🤖 Roles</span>
+              </button>
+              <button id="add-column-btn" class="glow-button">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>Add Column</span>
+              </button>
+            </div>
+          </header>
+
+          <!-- Board Columns Grid -->
+          <div id="kanban-board" class="kanban-board">
+            <!-- Columns are dynamically injected here -->
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Column Config Modal -->
+  <div id="column-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="column-modal-title">Column Configuration</h3>
+        <button class="icon-btn modal-close-btn" data-close-modal="column-modal">❌</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="modal-col-id">
+        <div class="form-group">
+          <label for="modal-col-name">Column Name</label>
+          <input type="text" id="modal-col-name" placeholder="e.g. Analysis Group">
+        </div>
+        
+        <div class="form-group row-checkbox">
+          <label class="checkbox-container">
+            <input type="checkbox" id="modal-col-agent-enabled">
+            <span class="checkmark"></span>
+            <span class="label-text">Enable Agent Auto-Processing (Hermes)</span>
+          </label>
+        </div>
+
+
+        <div class="form-group" id="modal-col-prompt-container">
+          <label for="modal-col-prompt">Agent Prompt Template</label>
+          <p class="field-desc">This prompt template is run against the card contents when moved to this column. Add routing instructions like <code>[MOVE_TO: Done]</code> to let the agent auto-transition the card.</p>
+          <textarea id="modal-col-prompt" placeholder="Describe instructions for Hermes to process this card..." rows="6"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="modal-col-delete-btn" class="danger-btn">Delete Column</button>
+        <button id="modal-col-save-btn" class="glow-button">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card Details / Edit / Comments Modal -->
+  <div id="card-modal" class="modal-overlay hidden">
+    <div class="modal-card card-detail-modal">
+      <div class="modal-header">
+        <div class="card-modal-header-title">
+          <span class="card-id-badge" id="modal-card-id-label">CARD-ID</span>
+          <h3 id="modal-card-title-text" contenteditable="true">Card Title</h3>
+        </div>
+        <button class="icon-btn modal-close-btn" data-close-modal="card-modal">❌</button>
+      </div>
+      <div class="modal-body card-modal-layout">
+        <!-- Left Pane: Card content -->
+        <div class="modal-pane-left">
+          <div class="form-group">
+            <label>Description</label>
+            <div id="modal-card-desc-container" class="card-desc-editable">
+              <textarea id="modal-card-desc-input" placeholder="Add a detailed description for this card..." rows="4"></textarea>
+            </div>
+          </div>
+          
+          <div class="card-processing-status hidden" id="card-modal-processing-indicator">
+            <span class="pulse-dot"></span>
+            <span>Hermes Agent is running in the background...</span>
+          </div>
+
+          <!-- Comment Thread -->
+          <div class="modal-comments-section">
+            <label>Discussion & Agent Output</label>
+            <div id="modal-card-comments-list" class="modal-comments-list">
+              <!-- Comments are injected here -->
+            </div>
+            
+            <div class="add-comment-container">
+              <textarea id="modal-new-comment-input" placeholder="Type a comment or ask Agent a follow-up..." rows="2"></textarea>
+              <div class="comment-action-bar">
+                <span class="field-desc">Agent outputs are saved here automatically.</span>
+                <button id="modal-add-comment-btn" class="glow-button">Add Comment</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Pane: Actions & Info -->
+        <div class="modal-pane-right">
+          <div class="meta-section">
+            <h4>Quick Actions</h4>
+            <div class="meta-item">
+              <span class="meta-label">Column:</span>
+              <select id="modal-card-column-select" class="dropdown-select">
+                <!-- Column options injected here -->
+              </select>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Session ID:</span>
+              <span id="modal-card-session-badge" class="session-badge-value">None</span>
+            </div>
+            <div class="meta-item" style="flex-direction: column; align-items: stretch; gap: 6px; margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 14px;">
+              <span class="meta-label">Card Owner (当前拥有者):</span>
+              <select id="modal-card-owner-select" class="dropdown-select" style="width: 100%;">
+                <option value="unassigned">待领取 (Unassigned)</option>
+                <option value="user">用户 (User)</option>
+                <!-- Agent options will be injected dynamically -->
+              </select>
+            </div>
+            <div class="meta-item" style="flex-direction: column; align-items: stretch; gap: 6px; margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 14px;">
+              <span class="meta-label">Stakeholders (关注的 Agents):</span>
+              <div id="modal-card-watchers-list" style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px; max-height: 180px; overflow-y: auto;">
+                <!-- Checkboxes will be injected here dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <div class="danger-zone">
+            <button id="modal-card-delete-btn" class="danger-btn full-width">Archive/Delete Card</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Project Create Modal -->
+  <div id="project-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Create New Project Workspace</h3>
+        <button class="icon-btn modal-close-btn" data-close-modal="project-modal">❌</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="modal-proj-name">Project Name</label>
+          <input type="text" id="modal-proj-name" placeholder="e.g. My Website App">
+        </div>
+        
+        <div class="form-group">
+          <label for="modal-proj-path">Project Directory Path (Absolute)</label>
+          <input type="text" id="modal-proj-path" placeholder="e.g. /home/yuan/my-website">
+          <p class="field-desc">This is the local directory where all project files will be created and modified by the Agent.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="danger-btn" style="visibility: hidden;">Placeholder</button>
+        <button id="modal-proj-save-btn" class="glow-button">Create Project</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Project Edit/Manage Modal -->
+  <div id="project-edit-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Manage Project Workspace</h3>
+        <button class="icon-btn modal-close-btn" data-close-modal="project-edit-modal">❌</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="modal-edit-proj-id">
+        <div class="form-group">
+          <label for="modal-edit-proj-name">Project Name</label>
+          <input type="text" id="modal-edit-proj-name" placeholder="e.g. My Website App">
+        </div>
+        
+        <div class="form-group">
+          <label for="modal-edit-proj-path">Project Directory Path (Absolute)</label>
+          <input type="text" id="modal-edit-proj-path" placeholder="e.g. /home/yuan/my-website">
+          <p class="field-desc">Changing this path will re-route files to the new directory. Note: existing files in the old directory will not be automatically moved.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="modal-edit-proj-delete-btn" class="danger-btn">Delete Project Registry</button>
+        <button id="modal-edit-proj-save-btn" class="glow-button">Save Changes</button>
+      </div>
+    </div>
+  </div>
+  <!-- Card Create Modal -->
+  <div id="card-create-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Create New Task Card</h3>
+        <button class="icon-btn modal-close-btn" data-close-modal="card-create-modal">❌</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="modal-create-card-col-id">
+        <div class="form-group">
+          <label for="modal-create-card-title">Card Title</label>
+          <input type="text" id="modal-create-card-title" placeholder="e.g. Implement API endpoint">
+        </div>
+        
+        <div class="form-group">
+          <label for="modal-create-card-desc">Description</label>
+          <textarea id="modal-create-card-desc" placeholder="Add details or instructions for the Agent..." rows="4"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="danger-btn" style="visibility: hidden;">Placeholder</button>
+        <button id="modal-create-card-save-btn" class="glow-button">Create Card</button>
+      </div>
+    </div>
+  </div>
+  <!-- Workspace Agents Manager Modal -->
+  <div id="agents-manager-modal" class="modal-overlay hidden">
+    <div class="modal-card card-detail-modal" style="max-width: 800px;">
+      <div class="modal-header">
+        <h3>Manage Workspace Agent Roles</h3>
+        <button class="icon-btn modal-close-btn" data-close-modal="agents-manager-modal">❌</button>
+      </div>
+      <div class="modal-body card-modal-layout">
+        <!-- Left Pane: Agents list -->
+        <div class="modal-pane-left" style="flex: 1; border-right: 1px solid var(--border-color); padding-right: 20px;">
+          <h4>Defined Roles</h4>
+          <div id="agents-manager-list" class="sidebar-agents-list" style="margin-top: 12px; max-height: 350px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+            <!-- Render list of agents here -->
+          </div>
+          <button id="agents-manager-new-btn" class="glow-button full-width" style="margin-top: 15px;">➕ Create New Role</button>
+        </div>
+        
+        <!-- Right Pane: Edit role details -->
+        <div class="modal-pane-right" style="flex: 1.5; padding-left: 20px; border-left: none;">
+          <h4 id="agent-editor-title">Role Configuration</h4>
+          <input type="hidden" id="modal-agent-id">
+          
+          <div class="form-group" style="margin-top: 12px;">
+            <label for="modal-agent-name">Agent Name</label>
+            <input type="text" id="modal-agent-name" placeholder="e.g. Code Reviewer">
+          </div>
+          
+          <div class="form-group">
+            <label for="modal-agent-prompt">System Role Definition (Instructions)</label>
+            <p class="field-desc">System instructions defining the persona, behavior, capabilities, and expected outputs of this Agent.</p>
+            <textarea id="modal-agent-prompt" placeholder="Describe instructions and routing logic for this Agent role..." rows="10" style="resize: vertical;"></textarea>
+          </div>
+          
+          <div class="modal-footer" style="padding: 10px 0 0 0; justify-content: space-between; border-top: none;">
+            <button id="modal-agent-delete-btn" class="danger-btn">Delete Role</button>
+            <button id="modal-agent-save-btn" class="glow-button">Save Changes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=1.0.9"></script>
+</body>
+</html>
