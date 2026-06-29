@@ -675,7 +675,9 @@ app.post('/api/stop', (req, res) => {
   let stoppedCount = 0;
   for (let i = runningProcesses.length - 1; i >= 0; i--) {
     const item = runningProcesses[i];
-    if (item.projectId === targetProjId || (cardId && item.cardId === cardId)) {
+    const matchesCard = cardId ? item.cardId === cardId : true;
+    const matchesProj = item.projectId === targetProjId;
+    if (matchesProj && matchesCard) {
       try {
         item.child.kill('SIGTERM');
         setTimeout(() => { try { item.child.kill('SIGKILL'); } catch (e) {} }, 500);
@@ -690,7 +692,9 @@ app.post('/api/stop', (req, res) => {
   // Also clear queue items for stopped cards
   for (let i = agentExecutionQueue.length - 1; i >= 0; i--) {
     const item = agentExecutionQueue[i];
-    if (item.projectId === targetProjId || (cardId && item.cardId === cardId)) {
+    const matchesCard = cardId ? item.cardId === cardId : true;
+    const matchesProj = item.projectId === targetProjId;
+    if (matchesProj && matchesCard) {
       agentExecutionQueue.splice(i, 1);
     }
   }
@@ -1390,7 +1394,11 @@ ${commentsHistory}
   child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
   child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
 
-  child.on('close', (code) => {
+  child.on('close', (code, signal) => {
+    if (signal) {
+      console.log(`[HermesCrew] Reevaluate process for card ${id} was terminated by signal ${signal}. Skipping completion logic.`);
+      return;
+    }
     const { kanban: freshKanban, kanbanPath: freshKanbanPath } = getProjectAndKanban(projectId);
     const freshCard = freshKanban.cards.find(c => c.id === id);
     if (!freshCard) return;
@@ -1607,13 +1615,15 @@ function processAgentDirectives(freshKanban, freshCard, text) {
   let cleaned = text;
 
   // 1. Process CREATE_SUBCARD directives (only applicable if attached to a card)
+  const subcardRegex = /\[CREATE_SUBCARD:\s*([^\]]+)\]/gi;
   if (freshCard) {
     if (!freshCard._createdSubcards) freshCard._createdSubcards = [];
-    const subcardRegex = /\[CREATE_SUBCARD:\s*([^|\]]+)(?:\|\s*([^\]]+))?\]/gi;
     let subMatch;
     while ((subMatch = subcardRegex.exec(text)) !== null) {
-      const subTitle = subMatch[1].trim();
-      const subDesc = subMatch[2] ? subMatch[2].trim() : '';
+      const content = subMatch[1];
+      const parts = content.split(/[|｜]/);
+      const subTitle = parts[0].trim();
+      const subDesc = parts[1] ? parts[1].trim() : '';
       if (subTitle) {
         const subCardId = 'card-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
         const subCard = {
@@ -1656,15 +1666,17 @@ function processAgentDirectives(freshKanban, freshCard, text) {
     }
     cleaned = cleaned.replace(subcardRegex, '').trim();
   } else {
-    cleaned = cleaned.replace(/\[CREATE_SUBCARD:\s*([^|\]]+)(?:\|\s*([^\]]+))?\]/gi, '').trim();
+    cleaned = cleaned.replace(subcardRegex, '').trim();
   }
 
   // 2. Process CREATE_AGENT directives
-  const agentRegex = /\[CREATE_AGENT:\s*([^|\]]+)(?:\|\s*([^\]]+))?\]/gi;
+  const agentRegex = /\[CREATE_AGENT:\s*([^\]]+)\]/gi;
   let agMatch;
   while ((agMatch = agentRegex.exec(text)) !== null) {
-    const agName = agMatch[1].trim();
-    const agPrompt = agMatch[2] ? agMatch[2].trim() : `You are ${agName}.`;
+    const content = agMatch[1];
+    const parts = content.split(/[|｜]/);
+    const agName = parts[0].trim();
+    const agPrompt = parts[1] ? parts[1].trim() : `You are ${agName}.`;
     if (agName) {
       const existing = freshKanban.agents ? freshKanban.agents.find(a => a.name.toLowerCase() === agName.toLowerCase()) : null;
       if (!existing) {
@@ -1689,6 +1701,7 @@ function processAgentDirectives(freshKanban, freshCard, text) {
     }
   }
   cleaned = cleaned.replace(agentRegex, '').trim();
+
 
   // 3. Process Scope update directives
   const scopeTypes = [
@@ -1794,7 +1807,11 @@ Please match the spelling exactly.
   child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
   child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
 
-  child.on('close', (code) => {
+  child.on('close', (code, signal) => {
+    if (signal) {
+      console.log(`[HermesCrew - ${project.name}] Direct Agent process for card ${cardId} was terminated by signal ${signal}. Skipping completion logic.`);
+      return;
+    }
     console.log(`[HermesCrew - ${project.name}] Direct Agent finished for card ${cardId}. Exit Code: ${code}`);
 
     const { kanban: freshKanban, kanbanPath: freshKanbanPath } = getProjectAndKanban(projectId);
@@ -2209,7 +2226,11 @@ Please match the spelling exactly.
   child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
   child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
 
-  child.on('close', (code) => {
+  child.on('close', (code, signal) => {
+    if (signal) {
+      console.log(`[HermesCrew - ${project.name}] Agent process for card ${cardId} was terminated by signal ${signal}. Skipping completion logic.`);
+      return;
+    }
     console.log(`[HermesCrew - ${project.name}] Agent finished for card ${cardId}. Exit Code: ${code}`);
 
     const { kanban: freshKanban, kanbanPath: freshKanbanPath } = getProjectAndKanban(projectId);
