@@ -1660,9 +1660,11 @@ function processAgentDirectives(freshKanban, freshCard, text) {
 
       if (subTitle && !isPlaceholder) {
         const subCardId = 'card-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+        const meetingCol = freshKanban.columns.find(c => c.isMeetingRoom || c.name.toLowerCase() === 'meeting room' || c.id === 'col-meeting');
+        const subCardColId = meetingCol ? meetingCol.id : freshCard.columnId;
         const subCard = {
           id: subCardId,
-          columnId: freshCard.columnId,
+          columnId: subCardColId,
           title: subTitle,
           description: subDesc,
           isProcessing: false,
@@ -2151,7 +2153,7 @@ ${commentsHistory}
 1. Each relevant Team Role Agent discusses the requirements, addresses comments, or proposes code/architecture approaches.
 2. If the task is too complex, any agent can explicitly split it into sub-cards by outputting:
    [CREATE_SUBCARD: Specify Subtask Title Here | Specify Subtask Description Here]
-   (CRITICAL: Replace the words "Specify Subtask Title Here" with the actual subtask title, and "Specify Subtask Description Here" with the actual subtask description. Never output the placeholders literally.)
+   (CRITICAL: Replace the words "Specify Subtask Title Here" with the actual subtask title, and "Specify Subtask Description Here" with the actual subtask description. Never output the placeholders literally. Note: This Meeting Room is the ONLY phase where sub-cards are allowed to be created.)
 3. If new specialized team members are required, recruit them by outputting:
    [CREATE_AGENT: Role Name | Role System Prompt]
 4. Finally, follow the Meeting Room Moderator Guidelines above to evaluate all inputs and conclude this round's discussion with ONE of the following status tags at the very end:
@@ -2225,9 +2227,8 @@ ${commentsHistory}
 
 [YOUR TASK STEPS]
 1. Analyze the card requirements against the team role agents listed above, and select the best qualified agent to own this task. Output [ASSIGN_TO: Agent Name].
-2. Perform the required work, execution, implementation, or data analysis for column phase "${column.name}". Resolve multi-step subtasks internally within your own workflow execution whenever possible.
-3. Subcard creation guidelines (STRICT NECESSITY ONLY): Do NOT create sub-cards for routine multi-step work. ONLY output [CREATE_SUBCARD: Specify Subtask Title Here | Specify Subtask Description Here] (CRITICAL: Replace the words "Specify Subtask Title Here" with the actual subtask title, and "Specify Subtask Description Here" with the actual subtask description. Never output the placeholders literally.) if a subtask is genuinely too massive and strictly requires independent parallel tracking by separate team roles.
-4. When your work is complete or ready for the next phase, output [MOVE_TO: Target Column Name] (e.g. [MOVE_TO: Done] or next target column).
+2. Perform the required work, execution, implementation, or data analysis for column phase "${column.name}". Do NOT attempt to split this card into sub-cards/subtasks; resolve all work directly.
+3. When your work is complete or ready for the next phase, output [MOVE_TO: Target Column Name] (e.g. [MOVE_TO: Done] or next target column).
 
 Available transition columns: ${columnsList}
 `;
@@ -2250,9 +2251,8 @@ ${commentsHistory}
 
 [TRANSITION DIRECTIVES & WORKFLOW COMPLETION]
 You are processing this Kanban card as an autonomous agent.
-1. Perform the required task processing, implementation, code writing, or analysis for phase "${column.name}". Process multi-step subtasks directly inside your own execution workflow.
-2. Subcard creation guidelines (STRICT NECESSITY ONLY): Do NOT create sub-cards for standard work steps. ONLY output [CREATE_SUBCARD: Specify Subtask Title Here | Specify Subtask Description Here] (CRITICAL: Replace the words "Specify Subtask Title Here" with the actual subtask title, and "Specify Subtask Description Here" with the actual subtask description. Never output the placeholders literally.) if a task is extraordinarily complex and strictly requires delegating to a separate asynchronous card.
-3. When your work on this card is finished or ready to move to another stage, you MUST output the following tag at the very end of your response:
+1. Perform the required task processing, implementation, code writing, or analysis for phase "${column.name}". Do NOT attempt to split this card into sub-cards/subtasks; resolve all work directly.
+2. When your work on this card is finished or ready to move to another stage, you MUST output the following tag at the very end of your response:
 [MOVE_TO: Column Name] (For example: [MOVE_TO: Done] when completed).
 
 The available columns you can move this card to are: ${columnsList}
@@ -2423,7 +2423,8 @@ Please match the spelling exactly.
 
     fs.writeFileSync(freshKanbanPath, JSON.stringify(freshKanban, null, 2), 'utf8');
 
-    // Automatically trigger autonomous execution for newly created sub-cards
+    // Automatically trigger autonomous execution for newly created sub-cards (disabled - place in Meeting Room only)
+    /*
     if (createdSubcards.length > 0) {
       createdSubcards.forEach((sub, idx) => {
         setTimeout(() => {
@@ -2432,6 +2433,7 @@ Please match the spelling exactly.
         }, (idx + 1) * 1000);
       });
     }
+    */
 
     if (isMeetingRoomCol && meetingStatus === 'CONTINUE' && !triggeredNextColumnId) {
       if (freshCard.meetingRounds < freshCard.maxBudget) {
