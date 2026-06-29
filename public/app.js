@@ -3,30 +3,52 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- View switcher ---
   const tabChat = document.getElementById('tab-chat');
   const tabKanban = document.getElementById('tab-kanban');
+  const tabConfig = document.getElementById('tab-config');
   const viewChat = document.getElementById('view-chat');
   const viewKanban = document.getElementById('view-kanban');
+  const viewConfig = document.getElementById('view-config');
 
   tabChat.addEventListener('click', () => {
     tabChat.classList.add('active');
     tabKanban.classList.remove('active');
+    tabConfig.classList.remove('active');
     viewChat.classList.add('active');
-    viewKanban.classList.remove('hidden');
-    viewKanban.classList.remove('active');
     viewChat.classList.remove('hidden');
+    viewKanban.classList.remove('active');
+    viewKanban.classList.add('hidden');
+    viewConfig.classList.remove('active');
+    viewConfig.classList.add('hidden');
     stopKanbanPolling();
   });
 
   tabKanban.addEventListener('click', () => {
     tabKanban.classList.add('active');
     tabChat.classList.remove('active');
+    tabConfig.classList.remove('active');
     viewKanban.classList.add('active');
-    viewChat.classList.add('hidden');
-    viewChat.classList.remove('active');
     viewKanban.classList.remove('hidden');
+    viewChat.classList.remove('active');
+    viewChat.classList.add('hidden');
+    viewConfig.classList.remove('active');
+    viewConfig.classList.add('hidden');
     startKanbanPolling();
     fetchProjects().then(() => {
       fetchKanbanBoard();
     });
+  });
+
+  tabConfig.addEventListener('click', () => {
+    tabConfig.classList.add('active');
+    tabChat.classList.remove('active');
+    tabKanban.classList.remove('active');
+    viewConfig.classList.add('active');
+    viewConfig.classList.remove('hidden');
+    viewChat.classList.remove('active');
+    viewChat.classList.add('hidden');
+    viewKanban.classList.remove('active');
+    viewKanban.classList.add('hidden');
+    stopKanbanPolling();
+    loadConfig();
   });
 
   // --- Chat Assistant Workspace Logic ---
@@ -1758,8 +1780,89 @@ document.addEventListener('DOMContentLoaded', () => {
          .replace(/'/g, "&#039;");
   }
 
+  // --- Config Settings Logic ---
+  
+  function loadConfig() {
+    const pathStatus = document.getElementById('status-hermes-path');
+    const dirStatus = document.getElementById('status-hermes-config-dir');
+    
+    pathStatus.textContent = 'Checking...';
+    pathStatus.className = 'status-indicator checking';
+    dirStatus.textContent = 'Checking...';
+    dirStatus.className = 'status-indicator checking';
+
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById('input-hermes-path').value = data.hermesPath;
+        document.getElementById('input-hermes-config-dir').value = data.hermesConfigDir;
+        
+        if (data.hermesPathExists) {
+          pathStatus.textContent = 'Found';
+          pathStatus.className = 'status-indicator success';
+        } else {
+          pathStatus.textContent = 'Not Found';
+          pathStatus.className = 'status-indicator danger';
+        }
+        
+        if (data.hermesConfigDirExists) {
+          dirStatus.textContent = 'Found';
+          dirStatus.className = 'status-indicator success';
+        } else {
+          dirStatus.textContent = 'Not Found';
+          dirStatus.className = 'status-indicator danger';
+        }
+      })
+      .catch(err => {
+        console.error('Failed to load config:', err);
+        pathStatus.textContent = 'Error';
+        pathStatus.className = 'status-indicator danger';
+        dirStatus.textContent = 'Error';
+        dirStatus.className = 'status-indicator danger';
+      });
+  }
+
+  function saveConfig() {
+    const hermesPath = document.getElementById('input-hermes-path').value.trim();
+    const hermesConfigDir = document.getElementById('input-hermes-config-dir').value.trim();
+    
+    if (!hermesPath || !hermesConfigDir) {
+      alert('Please fill out all configuration fields.');
+      return;
+    }
+
+    fetch('/api/config', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ hermesPath, hermesConfigDir })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        alert('Settings saved successfully!');
+        loadConfig(); // Refresh status indicators
+      } else {
+        alert('Failed to save settings: ' + data.error);
+      }
+    })
+    .catch(err => {
+      console.error('Failed to save config:', err);
+      alert('Error saving settings: ' + err);
+    });
+  }
+
+  const saveConfigBtn = document.getElementById('save-config-btn');
+  if (saveConfigBtn) {
+    saveConfigBtn.addEventListener('click', saveConfig);
+  }
+
   // Initialize Autocomplete at startup
   initMentionAutocomplete();
+
+  // Export functions to global scope for nav clicks
+  window.loadConfig = loadConfig;
 
   console.log('[Kanban Init] Initialization finished successfully!');
 });

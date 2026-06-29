@@ -2,9 +2,46 @@ const express = require('express');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Dynamic path configuration (avoids hardcoding user home paths)
+const DEFAULT_HERMES_PATH = path.join(os.homedir(), '.local/bin/hermes');
+const DEFAULT_HERMES_CONFIG_DIR = path.join(os.homedir(), '.hermes');
+const CONFIG_FILE = path.join(__dirname, 'config.json');
+
+function resolveHome(filepath) {
+  if (filepath && (filepath.startsWith('~/') || filepath === '~')) {
+    return filepath.replace('~', os.homedir());
+  }
+  return filepath;
+}
+
+function readConfig() {
+  let config = {
+    hermesPath: DEFAULT_HERMES_PATH,
+    hermesConfigDir: DEFAULT_HERMES_CONFIG_DIR
+  };
+  try {
+    if (fs.existsSync(CONFIG_FILE)) {
+      const saved = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+      config = { ...config, ...saved };
+    }
+  } catch (err) {
+    console.error('Error reading config file:', err);
+  }
+  return config;
+}
+
+function saveConfig(config) {
+  try {
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Error saving config file:', err);
+  }
+}
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -247,6 +284,49 @@ function cleanOutputAndSession(stdout, stderr) {
   };
 }
 
+// --- Configuration APIs ---
+
+// GET: Get current paths and status
+app.get('/api/config', (req, res) => {
+  const config = readConfig();
+  const resolvedPath = resolveHome(config.hermesPath);
+  const resolvedConfigDir = resolveHome(config.hermesConfigDir);
+  
+  let hermesPathExists = false;
+  try {
+    if (config.hermesPath === 'hermes') {
+      hermesPathExists = true;
+    } else {
+      hermesPathExists = fs.existsSync(resolvedPath);
+    }
+  } catch (e) {}
+  
+  let hermesConfigDirExists = false;
+  try {
+    hermesConfigDirExists = fs.existsSync(resolvedConfigDir);
+  } catch (e) {}
+  
+  res.json({
+    hermesPath: config.hermesPath,
+    resolvedHermesPath: resolvedPath,
+    hermesPathExists,
+    hermesConfigDir: config.hermesConfigDir,
+    resolvedHermesConfigDir: resolvedConfigDir,
+    hermesConfigDirExists
+  });
+});
+
+// POST: Update paths
+app.post('/api/config', (req, res) => {
+  const { hermesPath, hermesConfigDir } = req.body;
+  if (!hermesPath || !hermesConfigDir) {
+    return res.status(400).json({ error: 'All fields are required' });
+  }
+  const newConfig = { hermesPath, hermesConfigDir };
+  saveConfig(newConfig);
+  res.json({ success: true, config: newConfig });
+});
+
 // --- Chat Assistant APIs ---
 
 // GET: Get history list
@@ -268,7 +348,8 @@ app.get('/api/run-stream', (req, res) => {
 
   console.log(`Starting hermes chat. Prompt: "${prompt}", Session: "${sessionId || 'New'}"`);
 
-  const hermesPath = '/home/yuan/.local/bin/hermes';
+  const config = readConfig();
+  const hermesPath = resolveHome(config.hermesPath);
   const args = ['chat', '-q', prompt, '--yolo', '--accept-hooks', '-Q'];
   
   if (sessionId && sessionId !== 'null' && sessionId !== 'undefined') {
@@ -379,7 +460,8 @@ app.post('/api/run', (req, res) => {
 
   console.log(`Starting hermes chat via POST. Prompt: "${prompt}", Session: "${sessionId || 'New'}"`);
 
-  const hermesPath = '/home/yuan/.local/bin/hermes';
+  const config = readConfig();
+  const hermesPath = resolveHome(config.hermesPath);
   const args = ['chat', '-q', prompt, '--yolo', '--accept-hooks', '-Q'];
   
   if (sessionId) {
@@ -980,7 +1062,8 @@ The available columns you can move this card to are: ${columnsList}
 Please match the spelling exactly.
 `;
 
-  const hermesPath = '/home/yuan/.local/bin/hermes';
+  const config = readConfig();
+  const hermesPath = resolveHome(config.hermesPath);
   const args = ['chat', '-q', prompt, '--yolo', '--accept-hooks', '-Q'];
   
   if (card.sessionId) {
@@ -1240,7 +1323,8 @@ Please match the spelling exactly. If you wish to keep it in the current column 
 `;
   }
 
-  const hermesPath = '/home/yuan/.local/bin/hermes';
+  const config = readConfig();
+  const hermesPath = resolveHome(config.hermesPath);
   const args = ['chat', '-q', prompt, '--yolo', '--accept-hooks', '-Q'];
   
   if (card.sessionId) {

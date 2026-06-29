@@ -38,6 +38,7 @@
       <nav class="portal-tabs">
         <button id="tab-chat" class="tab-btn active">💬 Chat Workspace</button>
         <button id="tab-kanban" class="tab-btn">📋 Kanban Board</button>
+        <button id="tab-config" class="tab-btn">⚙️ Settings</button>
       </nav>
 
       <div class="portal-header-right">
@@ -201,6 +202,42 @@
           <!-- Board Columns Grid -->
           <div id="kanban-board" class="kanban-board">
             <!-- Columns are dynamically injected here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- View 3: Settings (Hidden initially) -->
+      <div id="view-config" class="view-container hidden">
+        <div class="settings-workspace">
+          <div class="settings-panel">
+            <div class="settings-header">
+              <h2>⚙️ System Settings</h2>
+              <p>Configure local binary and configuration paths for HermesCrew.</p>
+            </div>
+            
+            <div class="settings-form">
+              <div class="form-group">
+                <label for="input-hermes-path">Hermes Executable Path</label>
+                <div class="input-with-status">
+                  <input type="text" id="input-hermes-path" placeholder="e.g. ~/.local/bin/hermes or hermes">
+                  <span id="status-hermes-path" class="status-indicator">Checking...</span>
+                </div>
+                <small class="form-help">The path to the hermes command-line executable. Supports absolute paths or paths starting with <code>~/</code>.</small>
+              </div>
+
+              <div class="form-group">
+                <label for="input-hermes-config-dir">Hermes Config Directory (.hermes)</label>
+                <div class="input-with-status">
+                  <input type="text" id="input-hermes-config-dir" placeholder="e.g. ~/.hermes">
+                  <span id="status-hermes-config-dir" class="status-indicator">Checking...</span>
+                </div>
+                <small class="form-help">The directory where the Hermes agent stores its local settings and session data.</small>
+              </div>
+
+              <button id="save-config-btn" class="glow-button" style="margin-top: 10px; width: fit-content; padding: 12px 24px;">
+                <span>Save Settings</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
