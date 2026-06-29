@@ -84,6 +84,9 @@
                 <button id="open-full-chat-btn" class="glow-button" style="margin-right: 8px; background: linear-gradient(135deg, #06b6d4, #3b82f6);">
                   <span>💬 Workspace Chat Window</span>
                 </button>
+                <button id="toggle-task-filter-btn" class="glow-button" style="margin-right: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15);">
+                  <span>📋 Showing: All Tasks</span>
+                </button>
                 <button id="manage-agents-btn" class="glow-button" style="margin-right: 8px;">
                   <span>🤖 Roles</span>
                 </button>
@@ -299,15 +302,27 @@
             <p class="subtitle">Configure local CLI runners and agent parameters.</p>
             
             <div class="form-group" style="margin-top: 24px;">
-              <label for="input-hermes-path">Hermes CLI Executable Path</label>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label for="input-hermes-path" style="margin:0;">Hermes CLI Executable Path</label>
+                <span id="status-hermes-path" style="font-size: 0.75rem; padding: 2px 8px; border-radius: 4px;">Checking...</span>
+              </div>
               <input type="text" id="input-hermes-path" placeholder="e.g. ~/.nvm/versions/node/v22.18.0/bin/hermes">
               <p class="field-desc">Path to the hermes executable binary on your local system.</p>
             </div>
 
             <div class="form-group">
-              <label for="input-hermes-config-dir">Hermes Config Directory</label>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label for="input-hermes-config-dir" style="margin:0;">Hermes Config Directory</label>
+                <span id="status-hermes-config-dir" style="font-size: 0.75rem; padding: 2px 8px; border-radius: 4px;">Checking...</span>
+              </div>
               <input type="text" id="input-hermes-config-dir" placeholder="e.g. ~/.hermes">
               <p class="field-desc">Location of your local hermes runtime configuration directory.</p>
+            </div>
+
+            <div class="form-group">
+              <label for="input-max-concurrent-agents">Max Concurrent Executing Agents (Queue Limit)</label>
+              <input type="number" id="input-max-concurrent-agents" min="1" max="10" placeholder="3" value="3">
+              <p class="field-desc">Maximum number of Agent tasks running simultaneously. Additional tasks will wait in queue to avoid model RPM limits.</p>
             </div>
 
             <div style="margin-top: 30px; display: flex; justify-content: flex-end;">
@@ -364,88 +379,115 @@
           <span id="modal-card-id-label" class="card-id-badge">CARD-1</span>
           <h3 id="modal-card-title-text" style="margin: 0; font-size: 1.1rem;">Card Details</h3>
         </div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-left: auto; margin-right: 15px;">
+          <button id="modal-card-flip-stream-btn" class="glow-button sm-btn" style="padding: 4px 12px; font-size: 0.8rem;">⚡ Stream Live Progress</button>
+        </div>
         <button class="icon-btn modal-close-btn" data-close-modal="card-modal">❌</button>
       </div>
 
-      <div class="modal-body card-modal-layout">
-        <!-- Main Content Pane -->
-        <div class="modal-pane-left">
-          <div id="card-modal-processing-indicator" class="execution-badge status-running hidden" style="margin-bottom: 15px; width: fit-content; align-items: center;">
-            <span class="pulse-dot"></span>
-            <span>Agent is currently executing this card...</span>
-            <button id="modal-card-stop-execution-btn" class="danger-btn sm-btn" style="margin-left: 12px; padding: 2px 8px; font-size: 0.75rem;">⏹️ Stop Task</button>
-          </div>
+      <div class="modal-flip-container">
+        <div class="modal-flip-inner">
+          <!-- FRONT VIEW: Standard Details -->
+          <div class="modal-flip-front modal-body card-modal-layout">
+            <!-- Main Content Pane -->
+            <div class="modal-pane-left">
+              <div id="card-modal-processing-indicator" class="execution-badge status-running hidden" style="margin-bottom: 15px; width: fit-content; align-items: center;">
+                <span class="pulse-dot"></span>
+                <span>Agent is currently executing this card...</span>
+                <button id="modal-card-stop-execution-btn" class="danger-btn sm-btn" style="margin-left: 12px; padding: 2px 8px; font-size: 0.75rem;">⏹️ Stop Task</button>
+                <button id="modal-card-restart-task-btn" class="glow-button sm-btn" style="margin-left: 6px; padding: 2px 8px; font-size: 0.75rem;">🔄 Restart Task</button>
+              </div>
 
-          <div class="modal-comments-section">
-            <h4 class="section-title">Discussion & Agent Activity Log</h4>
-            <div id="modal-card-comments-list" class="modal-comments-list">
-              <!-- Comments injected here -->
+              <div class="modal-comments-section">
+                <h4 class="section-title">Discussion & Agent Activity Log</h4>
+                <div id="modal-card-comments-list" class="modal-comments-list">
+                  <!-- Comments injected here -->
+                </div>
+                
+                <div class="add-comment-container" style="position: relative;">
+                  <textarea id="modal-new-comment-input" placeholder="Add a comment or reply to agent... (Use @ to mention roles)" rows="2"></textarea>
+                  <div id="mention-autocomplete-dropdown" class="mention-autocomplete-dropdown hidden"></div>
+                  <div class="comment-action-bar">
+                    <span class="text-muted" style="font-size: 0.75rem;">Tip: Type @ to mention team agents</span>
+                    <button id="modal-add-comment-btn" class="glow-button sm-btn">Post Comment</button>
+                  </div>
+                </div>
+              </div>
             </div>
-            
-            <div class="add-comment-container" style="position: relative;">
-              <textarea id="modal-new-comment-input" placeholder="Add a comment or reply to agent... (Use @ to mention roles)" rows="2"></textarea>
-              <div id="mention-autocomplete-dropdown" class="mention-autocomplete-dropdown hidden"></div>
-              <div class="comment-action-bar">
-                <span class="text-muted" style="font-size: 0.75rem;">Tip: Type @ to mention team agents</span>
-                <button id="modal-add-comment-btn" class="glow-button sm-btn">Post Comment</button>
+
+            <!-- Meta Sidebar Pane -->
+            <div class="modal-pane-right">
+              <div class="form-group" style="margin-bottom: 20px;">
+                <label for="modal-card-desc-input">Task Description & Instructions</label>
+                <textarea id="modal-card-desc-input" rows="4" placeholder="Task details..."></textarea>
+              </div>
+
+              <div class="meta-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <h4 style="margin: 0;">Task Properties</h4>
+                  <button id="modal-card-reassign-btn" class="glow-button sm-btn" style="padding: 4px 10px; font-size: 0.75rem;">🤖 Auto-Assign Roles</button>
+                </div>
+                
+                <div class="meta-item">
+                  <span class="meta-label">Column:</span>
+                  <select id="modal-card-column-select" class="dropdown-select">
+                    <!-- Column options -->
+                  </select>
+                </div>
+
+                <div class="meta-item">
+                  <span class="meta-label">Session ID:</span>
+                  <span id="modal-card-session-badge" class="session-badge-value">None</span>
+                </div>
+                <div class="meta-item" style="flex-direction: column; align-items: stretch; gap: 6px; margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 14px;">
+                  <span class="meta-label">Card Owner:</span>
+                  <select id="modal-card-owner-select" class="dropdown-select" style="width: 100%;">
+                    <option value="unassigned">Unassigned</option>
+                    <option value="user">User</option>
+                    <!-- Agent options will be injected dynamically -->
+                  </select>
+                </div>
+                <div class="meta-item" style="flex-direction: column; align-items: stretch; gap: 6px; margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 14px;">
+                  <span class="meta-label">Stakeholders (Watching Agents):</span>
+                  <div id="modal-card-watchers-list" style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px; max-height: 180px; overflow-y: auto;">
+                    <!-- Checkboxes will be injected here dynamically -->
+                  </div>
+                </div>
+                <div class="meta-item" style="flex-direction: column; align-items: stretch; gap: 6px; margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 14px;">
+                  <span class="meta-label">💬 Meeting Budget:</span>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <span id="modal-card-budget-status" style="font-size: 0.85rem; color: var(--text-muted);">0 / 10 rounds</span>
+                    <button id="modal-card-reset-budget-btn" class="text-btn" style="margin-left: auto;">Reset Budget</button>
+                  </div>
+                </div>
+                <div class="meta-item" style="flex-direction: column; align-items: stretch; gap: 6px; margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 14px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span class="meta-label">📌 Sub-tasks (Created by Agent):</span>
+                  </div>
+                  <div id="modal-card-parent-link" style="font-size: 0.85rem; margin-top: 4px;"></div>
+                  <div id="modal-card-subcards-list" style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px; max-height: 140px; overflow-y: auto;"></div>
+                </div>
+              </div>
+
+              <div class="danger-zone">
+                <button id="modal-card-delete-btn" class="danger-btn full-width">Archive/Delete Card</button>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Meta Sidebar Pane -->
-        <div class="modal-pane-right">
-          <div class="form-group" style="margin-bottom: 20px;">
-            <label for="modal-card-desc-input">Task Description & Instructions</label>
-            <textarea id="modal-card-desc-input" rows="4" placeholder="Task details..."></textarea>
-          </div>
-
-          <div class="meta-section">
-            <h4>Task Properties</h4>
-            
-            <div class="meta-item">
-              <span class="meta-label">Column:</span>
-              <select id="modal-card-column-select" class="dropdown-select">
-                <!-- Column options -->
-              </select>
-            </div>
-
-            <div class="meta-item">
-              <span class="meta-label">Session ID:</span>
-              <span id="modal-card-session-badge" class="session-badge-value">None</span>
-            </div>
-            <div class="meta-item" style="flex-direction: column; align-items: stretch; gap: 6px; margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 14px;">
-              <span class="meta-label">Card Owner:</span>
-              <select id="modal-card-owner-select" class="dropdown-select" style="width: 100%;">
-                <option value="unassigned">Unassigned</option>
-                <option value="user">User</option>
-                <!-- Agent options will be injected dynamically -->
-              </select>
-            </div>
-            <div class="meta-item" style="flex-direction: column; align-items: stretch; gap: 6px; margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 14px;">
-              <span class="meta-label">Stakeholders (Watching Agents):</span>
-              <div id="modal-card-watchers-list" style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px; max-height: 180px; overflow-y: auto;">
-                <!-- Checkboxes will be injected here dynamically -->
+          <!-- BACK VIEW: Real-time Live Stream Terminal -->
+          <div class="modal-flip-back modal-body" style="display: flex; flex-direction: column; gap: 14px; background-color: #08080f; padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px;">
+              <h4 style="margin:0; color:var(--primary); font-size: 1rem;">⚡ Agent Real-Time Execution Log Stream</h4>
+              <div style="display: flex; gap: 10px; align-items: center;">
+                <button id="modal-stream-stop-btn" class="danger-btn sm-btn">⏹️ Stop Execution</button>
+                <button id="modal-stream-restart-btn" class="glow-button sm-btn">🔄 Restart Task</button>
+                <button id="modal-stream-back-btn" class="glow-button sm-btn" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2);">↩️ Back to Details</button>
               </div>
             </div>
-            <div class="meta-item" style="flex-direction: column; align-items: stretch; gap: 6px; margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 14px;">
-              <span class="meta-label">💬 Meeting Budget:</span>
-              <div style="display: flex; gap: 8px; align-items: center;">
-                <span id="modal-card-budget-status" style="font-size: 0.85rem; color: var(--text-muted);">0 / 10 rounds</span>
-                <button id="modal-card-reset-budget-btn" class="text-btn" style="margin-left: auto;">Reset Budget</button>
-              </div>
+            <div style="flex: 1; background-color: #040406; border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; overflow-y: auto; max-height: 600px;">
+              <pre id="modal-card-stream-text" style="margin:0; font-family:var(--font-mono, monospace); font-size: 0.82rem; color: #a7f3d0; white-space: pre-wrap; word-break: break-all;">Connecting to agent live stream...</pre>
             </div>
-            <div class="meta-item" style="flex-direction: column; align-items: stretch; gap: 6px; margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 14px;">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span class="meta-label">📌 Sub-tasks (Created by Agent):</span>
-              </div>
-              <div id="modal-card-parent-link" style="font-size: 0.85rem; margin-top: 4px;"></div>
-              <div id="modal-card-subcards-list" style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px; max-height: 140px; overflow-y: auto;"></div>
-            </div>
-          </div>
-
-          <div class="danger-zone">
-            <button id="modal-card-delete-btn" class="danger-btn full-width">Archive/Delete Card</button>
           </div>
         </div>
       </div>

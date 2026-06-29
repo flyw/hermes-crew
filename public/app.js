@@ -694,9 +694,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!response.ok) return;
       workspaceAgents = await response.json();
 
-      // Populate Card Details modal owner dropdown
+      // Populate Card Details modal owner dropdown only if options changed
       const cardOwnerSelect = document.getElementById('modal-card-owner-select');
-      if (cardOwnerSelect) {
+      if (cardOwnerSelect && cardOwnerSelect.children.length <= 2) {
         cardOwnerSelect.innerHTML = `
           <option value="unassigned">Unassigned</option>
           <option value="user">User</option>
@@ -1029,7 +1029,8 @@ ${text}
     closeModal('column-modal');
     
     fetchProjectScope();
-    fetchKanbanBoard();
+    lastKanbanFingerprint = '';
+    fetchKanbanBoard(true);
   });
 
   // Open Project Modal
@@ -1153,8 +1154,10 @@ ${text}
   });
 
   // --- Kanban Database Calls (scoped by currentProjectId) ---
+  let lastKanbanFingerprint = '';
+  let showActiveOnly = false;
 
-  async function fetchKanbanBoard() {
+  async function fetchKanbanBoard(force = false) {
     if (!currentProjectId) return;
     try {
       await fetchWorkspaceAgents();
@@ -1163,16 +1166,24 @@ ${text}
       if (!response.ok) return;
       const data = await response.json();
       
-      kanbanColumns = data.columns || [];
-      kanbanCards = data.cards || [];
-      
-      renderKanbanBoard();
-      
-      // If card detail modal is open, re-render it to show progress in real-time
-      if (activeDetailCardId) {
-        const activeCard = kanbanCards.find(c => c.id === activeDetailCardId);
-        if (activeCard) {
-          renderCardDetails(activeCard);
+      const newColumns = data.columns || [];
+      const newCards = data.cards || [];
+      const newFingerprint = JSON.stringify({ columns: newColumns, cards: newCards });
+      const hasChanged = (newFingerprint !== lastKanbanFingerprint);
+
+      if (hasChanged || force) {
+        lastKanbanFingerprint = newFingerprint;
+        kanbanColumns = newColumns;
+        kanbanCards = newCards;
+        
+        renderKanbanBoard();
+        
+        // If card detail modal is open, re-render it to show progress in real-time
+        if (activeDetailCardId) {
+          const activeCard = kanbanCards.find(c => c.id === activeDetailCardId);
+          if (activeCard) {
+            renderCardDetails(activeCard);
+          }
         }
       }
     } catch (err) {
@@ -1209,6 +1220,14 @@ ${text}
 
   function renderKanbanBoard() {
     const board = document.getElementById('kanban-board');
+    
+    // Capture existing column scroll positions before rebuilding
+    const scrollPosMap = {};
+    document.querySelectorAll('.kanban-cards-container').forEach(cnt => {
+      const colId = cnt.getAttribute('data-column-id');
+      if (colId) scrollPosMap[colId] = cnt.scrollTop;
+    });
+
     board.innerHTML = '';
 
     kanbanColumns.forEach(column => {
@@ -1232,7 +1251,7 @@ ${text}
       });
       
       // Filter cards for this column
-      const colCards = kanbanCards.filter(card => card.columnId === column.id);
+      const colCards = kanbanCards.filter(card => card.columnId === column.id && (!showActiveOnly || card.isProcessing || card.isQueued));
 
       colDiv.innerHTML = `
         <div class="kanban-column-header">
@@ -1265,9 +1284,12 @@ ${text}
         cardDiv.id = card.id;
 
         const commentsCount = card.comments ? card.comments.length : 0;
-        const processingHtml = card.isProcessing 
-          ? `<span class="card-processing-badge"><span class="pulse-dot"></span><span>Running...</span></span>`
-          : '';
+        let processingHtml = '';
+        if (card.isProcessing) {
+          processingHtml = `<span class="card-processing-badge"><span class="pulse-dot"></span><span>Running...</span></span>`;
+        } else if (card.isQueued) {
+          processingHtml = `<span class="card-queued-badge"><span class="pulse-dot-amber"></span><span>⏳ Queued...</span></span>`;
+        }
 
         const summaryHtml = card.agentSummary
           ? `<div class="kanban-card-summary ${card.agentSummary.toLowerCase().startsWith('error') ? 'error' : ''}">
@@ -1291,25 +1313,66 @@ ${text}
           }
         });
 
+        let ownerName = 'Unassigned';
+        if (card.owner === 'user') ownerName = 'User';
+        else if (card.owner && workspaceAgents) {
+          const ag = workspaceAgents.find(a => a.id === card.owner);
+          if (ag) ownerName = ag.name;
+        }
+
+        const isRunningOrQueued = card.isProcessing || card.isQueued;
+        const execBtnHtml = isRunningOrQueued
+          ? `<button class="grid-card-exec-btn grid-stop-btn" title="Stop Execution">⏹️</button>`
+          : `<button class="grid-card-exec-btn grid-start-btn" title="Start Task Execution">▶️</button>`;
+
         cardDiv.innerHTML = `
-          <div class="kanban-card-title">${escapeHtml(card.title)}</div>
+          <div class="grid-card-actions">
+            ${execBtnHtml}
+            <div class="mobile-card-move-wrapper" title="Move Card to Column">
+              <span class="mobile-card-move-icon">🔄</span>
+              <select class="mobile-card-move-select" data-card-id="${card.id}">
+                ${moveOptionsHtml}
+              </select>
+            </div>
+          </div>
+          <div class="kanban-card-title" style="padding-right: 48px;">${escapeHtml(card.title)}</div>
           <div class="kanban-card-desc">${escapeHtml(card.description || 'No description.')}</div>
           ${summaryHtml}
           <div class="kanban-card-footer">
             <span class="card-footer-comments">💬 ${commentsCount}${budgetBadge}${subcardBadge}</span>
             <span class="card-footer-status">${processingHtml}</span>
           </div>
-          
-          <!-- Mobile move dropdown -->
-          <span class="mobile-card-move-icon">🔄</span>
-          <select class="mobile-card-move-select" data-card-id="${card.id}">
-            ${moveOptionsHtml}
-          </select>
         `;
+
+        const gridExecBtn = cardDiv.querySelector('.grid-card-exec-btn');
+        if (gridExecBtn) {
+          gridExecBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (isRunningOrQueued) {
+              try {
+                gridExecBtn.disabled = true;
+                await fetch('/api/stop', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ projectId: currentProjectId, cardId: card.id })
+                });
+                fetchKanbanBoard();
+              } catch (err) { console.error('Failed to stop task:', err); }
+            } else {
+              try {
+                gridExecBtn.disabled = true;
+                await fetch(`/api/kanban/cards/${card.id}/restart?projectId=${encodeURIComponent(currentProjectId)}`, {
+                  method: 'POST'
+                });
+                fetchKanbanBoard();
+              } catch (err) { console.error('Failed to start task:', err); }
+            }
+          });
+        }
 
         // Click to open details
         cardDiv.addEventListener('click', (e) => {
-          if (e.target.classList.contains('mobile-card-move-select')) return;
+          if (e.target.classList.contains('mobile-card-move-select') || e.target.closest('.grid-card-actions')) return;
           openCardDetailModal(card);
         });
 
@@ -1399,6 +1462,14 @@ ${text}
       });
 
       board.appendChild(colDiv);
+    });
+
+    // Restore column scroll positions after rebuilding
+    document.querySelectorAll('.kanban-cards-container').forEach(cnt => {
+      const colId = cnt.getAttribute('data-column-id');
+      if (colId && scrollPosMap[colId] !== undefined) {
+        cnt.scrollTop = scrollPosMap[colId];
+      }
     });
   }
 
@@ -1517,7 +1588,7 @@ ${text}
   });
 
   // --- Card Detail Modal Logic ---
-
+  const cardModalBox = document.querySelector('.card-detail-modal');
   const modalColIdField = document.getElementById('modal-card-id-label');
   const modalCardIdLabel = document.getElementById('modal-card-id-label');
   const modalCardTitleText = document.getElementById('modal-card-title-text');
@@ -1547,6 +1618,124 @@ ${text}
     });
   }
 
+  // Card Modal 3D Flip Stream Controls
+  const modalCardFlipStreamBtn = document.getElementById('modal-card-flip-stream-btn');
+  const modalStreamBackBtn = document.getElementById('modal-stream-back-btn');
+  const modalStreamStopBtn = document.getElementById('modal-stream-stop-btn');
+  const modalCardStreamText = document.getElementById('modal-card-stream-text');
+  let modalStreamEventSource = null;
+
+  const startModalLiveStream = () => {
+    if (!activeDetailCardId) return;
+    if (cardModalBox) cardModalBox.classList.add('show-stream');
+    if (modalStreamEventSource) modalStreamEventSource.close();
+    if (modalCardStreamText) modalCardStreamText.textContent = 'Connecting agent live stream...\n';
+
+    modalStreamEventSource = new EventSource(`/api/kanban/cards/${activeDetailCardId}/stream`);
+    modalStreamEventSource.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.chunk) {
+          if (modalCardStreamText.textContent.includes('Connecting')) {
+            modalCardStreamText.textContent = '';
+          }
+          modalCardStreamText.textContent += data.chunk;
+          const container = modalCardStreamText.parentElement;
+          if (container) container.scrollTop = container.scrollHeight;
+        }
+        if (data.done) {
+          if (modalStreamEventSource) {
+            modalStreamEventSource.close();
+            modalStreamEventSource = null;
+          }
+        }
+      } catch(err) {
+        console.error('Error parsing modal stream chunk:', err);
+      }
+    };
+    modalStreamEventSource.onerror = () => {
+      if (modalCardStreamText && modalCardStreamText.textContent.includes('Connecting')) {
+        modalCardStreamText.textContent = 'No active live stream running. (Click "Restart Task" to launch execution stream)';
+      }
+      if (modalStreamEventSource) {
+        modalStreamEventSource.close();
+        modalStreamEventSource = null;
+      }
+    };
+  };
+
+  if (modalCardFlipStreamBtn) {
+    modalCardFlipStreamBtn.addEventListener('click', () => {
+      startModalLiveStream();
+    });
+  }
+
+  if (cardModalProcessingIndicator) {
+    cardModalProcessingIndicator.style.cursor = 'pointer';
+    cardModalProcessingIndicator.addEventListener('click', (e) => {
+      if (e.target.id === 'modal-card-stop-execution-btn') return;
+      startModalLiveStream();
+    });
+  }
+
+  if (modalStreamBackBtn) {
+    modalStreamBackBtn.addEventListener('click', () => {
+      if (modalStreamEventSource) {
+        modalStreamEventSource.close();
+        modalStreamEventSource = null;
+      }
+      if (cardModalBox) cardModalBox.classList.remove('show-stream');
+    });
+  }
+
+  const modalCardRestartTaskBtn = document.getElementById('modal-card-restart-task-btn');
+  const modalStreamRestartBtn = document.getElementById('modal-stream-restart-btn');
+
+  const restartActiveCardTask = async (btnEl) => {
+    if (!activeDetailCardId || !currentProjectId) return;
+    try {
+      if (btnEl) { btnEl.disabled = true; btnEl.textContent = 'Restarting...'; }
+      await fetch(`/api/kanban/cards/${activeDetailCardId}/restart?projectId=${encodeURIComponent(currentProjectId)}`, {
+        method: 'POST'
+      });
+      startModalLiveStream();
+      await fetchKanbanBoard();
+    } catch(err) {
+      console.error('Error restarting card task:', err);
+    } finally {
+      if (btnEl) { btnEl.disabled = false; btnEl.textContent = '🔄 Restart Task'; }
+    }
+  };
+
+  if (modalCardRestartTaskBtn) {
+    modalCardRestartTaskBtn.addEventListener('click', () => restartActiveCardTask(modalCardRestartTaskBtn));
+  }
+  if (modalStreamRestartBtn) {
+    modalStreamRestartBtn.addEventListener('click', () => restartActiveCardTask(modalStreamRestartBtn));
+  }
+
+  if (modalStreamStopBtn) {
+    modalStreamStopBtn.addEventListener('click', async () => {
+      if (!activeDetailCardId || !currentProjectId) return;
+      try {
+        modalStreamStopBtn.disabled = true;
+        modalStreamStopBtn.textContent = 'Stopping...';
+        await fetch('/api/stop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId: currentProjectId, cardId: activeDetailCardId })
+        });
+        if (modalCardStreamText) modalCardStreamText.textContent += '\n\n⏹️ Task execution stopped by user.\n';
+        fetchKanbanBoard();
+      } catch(err) {
+        console.error('Error stopping card task in modal:', err);
+      } finally {
+        modalStreamStopBtn.disabled = false;
+        modalStreamStopBtn.textContent = '⏹️ Stop Execution';
+      }
+    });
+  }
+
   // Card Owner & Watchers Bindings
   const modalCardOwnerSelect = document.getElementById('modal-card-owner-select');
   const modalCardWatchersList = document.getElementById('modal-card-watchers-list');
@@ -1554,6 +1743,7 @@ ${text}
   function openCardDetailModal(card) {
     activeDetailCardId = card.id;
     cardModalJustOpened = true;
+    if (cardModalBox) cardModalBox.classList.remove('show-stream');
     renderCardDetails(card);
     openModal('card-modal');
   }
@@ -1564,8 +1754,13 @@ ${text}
     modalCardDescInput.value = card.description || '';
     modalCardSessionBadge.textContent = card.sessionId || 'None';
 
+    const statusSpan = cardModalProcessingIndicator ? cardModalProcessingIndicator.querySelector('span:not(.pulse-dot)') : null;
     if (card.isProcessing) {
       cardModalProcessingIndicator.classList.remove('hidden');
+      if (statusSpan) statusSpan.textContent = 'Agent is currently executing this card...';
+    } else if (card.isQueued || (card.agentSummary && card.agentSummary.includes('Queued'))) {
+      cardModalProcessingIndicator.classList.remove('hidden');
+      if (statusSpan) statusSpan.textContent = '⏳ Task is queued in execution pipeline (waiting for slot)...';
     } else {
       cardModalProcessingIndicator.classList.add('hidden');
     }
@@ -1694,6 +1889,26 @@ ${text}
       if (activeDetailCardId) {
         await updateCardFields(activeDetailCardId, { meetingRounds: 0 });
         fetchKanbanBoard();
+      }
+    });
+  }
+
+  const reassignBtn = document.getElementById('modal-card-reassign-btn');
+  if (reassignBtn) {
+    reassignBtn.addEventListener('click', async () => {
+      if (!activeDetailCardId) return;
+      try {
+        reassignBtn.disabled = true;
+        reassignBtn.textContent = "⏳ Analyzing...";
+        await fetch(`/api/kanban/cards/${activeDetailCardId}/reevaluate?projectId=${encodeURIComponent(currentProjectId)}`, {
+          method: 'POST'
+        });
+        await fetchKanbanBoard();
+      } catch (err) {
+        console.error('Error re-evaluating roles:', err);
+      } finally {
+        reassignBtn.disabled = false;
+        reassignBtn.textContent = "🤖 Auto-Assign Roles";
       }
     });
   }
@@ -1872,6 +2087,25 @@ ${text}
 
 
   // Workspace Agents Manager Controls
+  const toggleTaskFilterBtn = document.getElementById('toggle-task-filter-btn');
+  if (toggleTaskFilterBtn) {
+    toggleTaskFilterBtn.addEventListener('click', () => {
+      showActiveOnly = !showActiveOnly;
+      if (showActiveOnly) {
+        toggleTaskFilterBtn.innerHTML = '<span>⚡ Showing: Active Tasks</span>';
+        toggleTaskFilterBtn.style.background = 'rgba(245, 158, 11, 0.2)';
+        toggleTaskFilterBtn.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+        toggleTaskFilterBtn.style.color = '#fbbf24';
+      } else {
+        toggleTaskFilterBtn.innerHTML = '<span>📋 Showing: All Tasks</span>';
+        toggleTaskFilterBtn.style.background = 'rgba(255, 255, 255, 0.05)';
+        toggleTaskFilterBtn.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+        toggleTaskFilterBtn.style.color = '';
+      }
+      renderKanbanBoard();
+    });
+  }
+
   const manageAgentsBtn = document.getElementById('manage-agents-btn');
   const agentsManagerList = document.getElementById('agents-manager-list');
   const agentsManagerNewBtn = document.getElementById('agents-manager-new-btn');
@@ -2226,45 +2460,64 @@ ${text}
     const pathStatus = document.getElementById('status-hermes-path');
     const dirStatus = document.getElementById('status-hermes-config-dir');
     
-    pathStatus.textContent = 'Checking...';
-    pathStatus.className = 'status-indicator checking';
-    dirStatus.textContent = 'Checking...';
-    dirStatus.className = 'status-indicator checking';
+    if (pathStatus) {
+      pathStatus.textContent = 'Checking...';
+      pathStatus.className = 'status-indicator checking';
+    }
+    if (dirStatus) {
+      dirStatus.textContent = 'Checking...';
+      dirStatus.className = 'status-indicator checking';
+    }
 
     fetch('/api/config')
       .then(res => res.json())
       .then(data => {
-        document.getElementById('input-hermes-path').value = data.hermesPath;
-        document.getElementById('input-hermes-config-dir').value = data.hermesConfigDir;
+        const pathInput = document.getElementById('input-hermes-path');
+        const dirInput = document.getElementById('input-hermes-config-dir');
+        if (pathInput) pathInput.value = data.hermesPath || '';
+        if (dirInput) dirInput.value = data.hermesConfigDir || '';
         
-        if (data.hermesPathExists) {
-          pathStatus.textContent = 'Found';
-          pathStatus.className = 'status-indicator success';
-        } else {
-          pathStatus.textContent = 'Not Found';
-          pathStatus.className = 'status-indicator danger';
+        const maxAgentInput = document.getElementById('input-max-concurrent-agents');
+        if (maxAgentInput) maxAgentInput.value = data.maxConcurrentAgents || 3;
+        
+        if (pathStatus) {
+          if (data.hermesPathExists) {
+            pathStatus.textContent = 'Found';
+            pathStatus.className = 'status-indicator success';
+          } else {
+            pathStatus.textContent = 'Not Found';
+            pathStatus.className = 'status-indicator danger';
+          }
         }
         
-        if (data.hermesConfigDirExists) {
-          dirStatus.textContent = 'Found';
-          dirStatus.className = 'status-indicator success';
-        } else {
-          dirStatus.textContent = 'Not Found';
-          dirStatus.className = 'status-indicator danger';
+        if (dirStatus) {
+          if (data.hermesConfigDirExists) {
+            dirStatus.textContent = 'Found';
+            dirStatus.className = 'status-indicator success';
+          } else {
+            dirStatus.textContent = 'Not Found';
+            dirStatus.className = 'status-indicator danger';
+          }
         }
       })
       .catch(err => {
         console.error('Failed to load config:', err);
-        pathStatus.textContent = 'Error';
-        pathStatus.className = 'status-indicator danger';
-        dirStatus.textContent = 'Error';
-        dirStatus.className = 'status-indicator danger';
+        if (pathStatus) {
+          pathStatus.textContent = 'Error';
+          pathStatus.className = 'status-indicator danger';
+        }
+        if (dirStatus) {
+          dirStatus.textContent = 'Error';
+          dirStatus.className = 'status-indicator danger';
+        }
       });
   }
 
   function saveConfig() {
     const hermesPath = document.getElementById('input-hermes-path').value.trim();
     const hermesConfigDir = document.getElementById('input-hermes-config-dir').value.trim();
+    const maxAgentInput = document.getElementById('input-max-concurrent-agents');
+    const maxConcurrentAgents = maxAgentInput ? (parseInt(maxAgentInput.value, 10) || 3) : 3;
     
     if (!hermesPath || !hermesConfigDir) {
       alert('Please fill out all configuration fields.');
@@ -2276,7 +2529,7 @@ ${text}
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ hermesPath, hermesConfigDir })
+      body: JSON.stringify({ hermesPath, hermesConfigDir, maxConcurrentAgents })
     })
     .then(res => res.json())
     .then(data => {

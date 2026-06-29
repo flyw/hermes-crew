@@ -12,11 +12,36 @@ const runningProcesses = [];
 
 function registerRunningProcess({ projectId, cardId, child }) {
   if (!child || !child.pid) return;
-  const item = { pid: child.pid, projectId: projectId || 'proj-default', cardId, child };
+  const item = { pid: child.pid, projectId: projectId || 'proj-default', cardId, child, logs: '', listeners: [] };
   runningProcesses.push(item);
+
+  if (child.stdout) {
+    child.stdout.on('data', (chunk) => {
+      const text = chunk.toString();
+      item.logs += text;
+      item.listeners.forEach(res => {
+        try { res.write(`data: ${JSON.stringify({ chunk: text })}\n\n`); } catch(e){}
+      });
+    });
+  }
+  if (child.stderr) {
+    child.stderr.on('data', (chunk) => {
+      const text = chunk.toString();
+      item.logs += text;
+      item.listeners.forEach(res => {
+        try { res.write(`data: ${JSON.stringify({ chunk: text })}\n\n`); } catch(e){}
+      });
+    });
+  }
+
   const cleanup = () => {
+    item.listeners.forEach(res => {
+      try { res.write(`data: ${JSON.stringify({ done: true })}\n\n`); res.end(); } catch(e){}
+    });
+    item.listeners = [];
     const idx = runningProcesses.findIndex(p => p.pid === child.pid);
     if (idx !== -1) runningProcesses.splice(idx, 1);
+    processAgentExecutionQueue();
   };
   child.on('close', cleanup);
   child.on('error', cleanup);
@@ -37,7 +62,8 @@ function resolveHome(filepath) {
 function readConfig() {
   let config = {
     hermesPath: DEFAULT_HERMES_PATH,
-    hermesConfigDir: DEFAULT_HERMES_CONFIG_DIR
+    hermesConfigDir: DEFAULT_HERMES_CONFIG_DIR,
+    maxConcurrentAgents: 3
   };
   try {
     if (fs.existsSync(CONFIG_FILE)) {
@@ -47,6 +73,9 @@ function readConfig() {
   } catch (err) {
     console.error('Error reading config file:', err);
   }
+  if (!config.hermesPath) config.hermesPath = DEFAULT_HERMES_PATH;
+  if (!config.hermesConfigDir) config.hermesConfigDir = DEFAULT_HERMES_CONFIG_DIR;
+  if (!config.maxConcurrentAgents || isNaN(config.maxConcurrentAgents)) config.maxConcurrentAgents = 3;
   return config;
 }
 
@@ -404,18 +433,23 @@ app.get('/api/config', (req, res) => {
     hermesPathExists,
     hermesConfigDir: config.hermesConfigDir,
     resolvedHermesConfigDir: resolvedConfigDir,
-    hermesConfigDirExists
+    hermesConfigDirExists,
+    maxConcurrentAgents: config.maxConcurrentAgents || 3
   });
 });
 
-// POST: Update paths
+// POST: Update paths & config
 app.post('/api/config', (req, res) => {
-  const { hermesPath, hermesConfigDir } = req.body;
-  if (!hermesPath || !hermesConfigDir) {
-    return res.status(400).json({ error: 'All fields are required' });
-  }
-  const newConfig = { hermesPath, hermesConfigDir };
+  const { hermesPath, hermesConfigDir, maxConcurrentAgents } = req.body;
+  const currentConfig = readConfig();
+  const newConfig = {
+    ...currentConfig,
+    hermesPath: hermesPath || currentConfig.hermesPath,
+    hermesConfigDir: hermesConfigDir || currentConfig.hermesConfigDir,
+    maxConcurrentAgents: maxConcurrentAgents !== undefined ? parseInt(maxConcurrentAgents, 10) : (currentConfig.maxConcurrentAgents || 3)
+  };
   saveConfig(newConfig);
+  processAgentExecutionQueue();
   res.json({ success: true, config: newConfig });
 });
 
@@ -449,7 +483,7 @@ app.get('/api/run-stream', (req, res) => {
 
   const config = readConfig();
   const hermesPath = resolveHome(config.hermesPath);
-  const args = ['chat', '-q', prompt, '--yolo', '--accept-hooks', '-Q'];
+  const args = ['chat', '-q', prompt, '--yolo', '--accept-hooks'];
   
   if (sessionId && sessionId !== 'null' && sessionId !== 'undefined') {
     args.push('--resume', sessionId);
@@ -569,7 +603,7 @@ app.post('/api/run', (req, res) => {
 
   const config = readConfig();
   const hermesPath = resolveHome(config.hermesPath);
-  const args = ['chat', '-q', prompt, '--yolo', '--accept-hooks', '-Q'];
+  const args = ['chat', '-q', prompt, '--yolo', '--accept-hooks'];
   
   if (sessionId && sessionId !== 'null' && sessionId !== 'undefined') {
     args.push('--resume', sessionId);
@@ -653,12 +687,21 @@ app.post('/api/stop', (req, res) => {
     }
   }
 
-  // Clear isProcessing flag on cards for this project
+  // Also clear queue items for stopped cards
+  for (let i = agentExecutionQueue.length - 1; i >= 0; i--) {
+    const item = agentExecutionQueue[i];
+    if (item.projectId === targetProjId || (cardId && item.cardId === cardId)) {
+      agentExecutionQueue.splice(i, 1);
+    }
+  }
+
+  // Clear isProcessing & isQueued flags on cards for this project
   const { kanban, kanbanPath } = getProjectAndKanban(targetProjId);
   let updated = false;
   kanban.cards.forEach(c => {
-    if (c.isProcessing && (!cardId || c.id === cardId)) {
+    if ((c.isProcessing || c.isQueued) && (!cardId || c.id === cardId)) {
       c.isProcessing = false;
+      c.isQueued = false;
       c.agentSummary = 'Execution terminated by user.';
       updated = true;
     }
@@ -667,8 +710,40 @@ app.post('/api/stop', (req, res) => {
     fs.writeFileSync(kanbanPath, JSON.stringify(kanban, null, 2), 'utf8');
   }
 
+  processAgentExecutionQueue();
+
   console.log(`[HermesCrew] Stopped ${stoppedCount} running processes for project ${targetProjId}`);
   res.json({ success: true, stoppedCount });
+});
+
+// GET: Stream card execution logs in real-time
+app.get('/api/kanban/cards/:id/stream', (req, res) => {
+  const { id } = req.params;
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const activeProc = runningProcesses.find(p => p.cardId === id);
+  if (activeProc) {
+    if (activeProc.logs) {
+      res.write(`data: ${JSON.stringify({ chunk: activeProc.logs })}\n\n`);
+    }
+    activeProc.listeners.push(res);
+    req.on('close', () => {
+      const idx = activeProc.listeners.indexOf(res);
+      if (idx !== -1) activeProc.listeners.splice(idx, 1);
+    });
+  } else {
+    const inQueue = agentExecutionQueue.find(q => q.cardId === id);
+    if (inQueue) {
+      const queuePos = agentExecutionQueue.indexOf(inQueue) + 1;
+      res.write(`data: ${JSON.stringify({ chunk: `⏳ Task is queued in execution pipeline (Position #${queuePos}). Waiting for available process slot...\n`, done: false })}\n\n`);
+    } else {
+      res.write(`data: ${JSON.stringify({ chunk: 'No active background process running for this card.\n[Tip: Click "Restart Task" or "Auto-Assign Roles" to launch execution stream]', done: true })}\n\n`);
+      res.end();
+    }
+  }
 });
 
 // DELETE: Delete a specific session by ID
@@ -805,7 +880,33 @@ app.put('/api/projects/:id', (req, res) => {
 // GET: Full board data for a project
 app.get('/api/kanban', (req, res) => {
   const { projectId } = req.query;
-  const { kanban } = getProjectAndKanban(projectId);
+  processAgentExecutionQueue();
+  const { kanban, kanbanPath } = getProjectAndKanban(projectId);
+
+  let dirty = false;
+  if (kanban.cards) {
+    kanban.cards.forEach(card => {
+      const isActuallyRunning = runningProcesses.some(p => p.cardId === card.id);
+      const isQueued = agentExecutionQueue.some(q => q.cardId === card.id);
+
+      if (card.isProcessing !== isActuallyRunning) {
+        card.isProcessing = isActuallyRunning;
+        dirty = true;
+      }
+      if (card.isQueued !== isQueued) {
+        card.isQueued = isQueued;
+        dirty = true;
+      }
+      if (!isActuallyRunning && !isQueued && card.agentSummary && card.agentSummary.includes('Queued')) {
+        card.agentSummary = '';
+        dirty = true;
+      }
+    });
+  }
+  if (dirty) {
+    fs.writeFileSync(kanbanPath, JSON.stringify(kanban, null, 2), 'utf8');
+  }
+
   res.json(kanban);
 });
 
@@ -1228,6 +1329,174 @@ app.post('/api/kanban/cards/:id/comments', (req, res) => {
   res.json(newComment);
 });
 
+// POST: Re-evaluate card owner and stakeholders/watchers
+app.post('/api/kanban/cards/:id/reevaluate', (req, res) => {
+  const { id } = req.params;
+  const { projectId } = req.query;
+
+  const { project, kanban, kanbanPath } = getProjectAndKanban(projectId);
+  const card = kanban.cards.find(c => c.id === id);
+  if (!card) {
+    return res.status(404).json({ error: 'Card not found' });
+  }
+
+  card.isProcessing = true;
+  fs.writeFileSync(kanbanPath, JSON.stringify(kanban, null, 2), 'utf8');
+
+  const teamAgents = kanban.agents || [];
+  const teamDetails = teamAgents.map(a => `- **${a.name}**: ${a.prompt}`).join('\n');
+  const commentsHistory = card.comments && card.comments.length > 0
+    ? card.comments.map(c => `- ${c.author}: ${c.text}`).join('\n')
+    : '(No comments yet)';
+
+  const prompt = `
+[SYSTEM INSTRUCTION: AUTONOMOUS ROLE ASSIGNMENT & STAKEHOLDER RE-EVALUATION]
+You are Senior Hermes Coordinator. Evaluate the card below against all available workspace team role agents to determine optimal ownership and stakeholders.
+
+AVAILABLE TEAM ROLE AGENTS IN WORKSPACE:
+${teamDetails}
+
+[CARD DETAILS]
+Title: ${card.title}
+Description: ${card.description}
+
+[CARD COMMENTS & DISCUSSION HISTORY]
+${commentsHistory}
+
+[YOUR TASK STEPS]
+1. Analyze the technical and domain requirements of this card against the team role agents listed above.
+2. Select the single best qualified agent to be the primary Owner. Output [ASSIGN_TO: Agent Name].
+3. Select all relevant team role agents that should watch / be involved in this card as Stakeholders. Output [SET_WATCHERS: Agent Name 1, Agent Name 2].
+4. Provide a brief breakdown explaining why these roles were assigned.
+`;
+
+  const config = readConfig();
+  const hermesPath = resolveHome(config.hermesPath);
+  const args = ['chat', '-q', prompt, '--yolo', '--accept-hooks'];
+
+  if (card.sessionId) {
+    args.push('--resume', card.sessionId);
+  }
+
+  const child = spawn(hermesPath, args, {
+    cwd: project.path,
+    env: { ...process.env, PAGER: 'cat', PYTHONUNBUFFERED: '1' }
+  });
+  registerRunningProcess({ projectId: project.id, cardId: card.id, child });
+
+  let stdout = '';
+  let stderr = '';
+
+  child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
+  child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
+
+  child.on('close', (code) => {
+    const { kanban: freshKanban, kanbanPath: freshKanbanPath } = getProjectAndKanban(projectId);
+    const freshCard = freshKanban.cards.find(c => c.id === id);
+    if (!freshCard) return;
+
+    let cleaned = stdout.replace(/session_id:\s*[^\s\n]+/gi, '').replace(/^↻ Resumed session.*?\n/im, '').trim();
+
+    let targetAssignment = null;
+    const assignMatch = cleaned.match(/\[ASSIGN_TO:\s*([^\]]+)\]/i);
+    if (assignMatch) {
+      targetAssignment = assignMatch[1].trim();
+      cleaned = cleaned.replace(/\[ASSIGN_TO:\s*[^\]]+\]/gi, '').trim();
+    }
+
+    let targetWatchersStr = null;
+    const watchersMatch = cleaned.match(/\[SET_WATCHERS:\s*([^\]]+)\]/i);
+    if (watchersMatch) {
+      targetWatchersStr = watchersMatch[1].trim();
+      cleaned = cleaned.replace(/\[SET_WATCHERS:\s*[^\]]+\]/gi, '').trim();
+    }
+
+    cleaned = processAgentDirectives(freshKanban, freshCard, cleaned);
+
+    if (!freshCard.comments) freshCard.comments = [];
+    freshCard.comments.push({
+      id: 'comment-' + Date.now(),
+      author: 'Hermes Coordinator',
+      text: cleaned || 'Re-evaluated team roles and stakeholders for this card.',
+      timestamp: new Date().toISOString()
+    });
+
+    if (targetAssignment) {
+      const targetAgent = freshKanban.agents ? freshKanban.agents.find(a => a.name.toLowerCase() === targetAssignment.toLowerCase()) : null;
+      if (targetAgent) freshCard.owner = targetAgent.id;
+    }
+
+    if (targetWatchersStr) {
+      const names = targetWatchersStr.split(/[,|]/).map(n => n.trim().toLowerCase());
+      const matchedIds = [];
+      if (freshKanban.agents) {
+        freshKanban.agents.forEach(a => {
+          if (names.some(n => n === a.name.toLowerCase() || a.name.toLowerCase().includes(n))) {
+            matchedIds.push(a.id);
+          }
+        });
+      }
+      freshCard.watchers = matchedIds;
+    }
+
+    freshCard.isProcessing = false;
+    fs.writeFileSync(freshKanbanPath, JSON.stringify(freshKanban, null, 2), 'utf8');
+
+    // Trigger immediate execution by assigned owner/column agent
+    const currentCol = freshKanban.columns.find(c => c.id === freshCard.columnId);
+    if (currentCol && currentCol.agentEnabled && freshCard.owner !== 'user') {
+      console.log(`[HermesCrew] Role re-evaluation complete. Triggering immediate execution for Card "${freshCard.title}"...`);
+      setTimeout(() => {
+        triggerAgentForCard(id, freshCard.columnId, projectId);
+      }, 500);
+    }
+  });
+
+  res.json({ success: true, message: 'Role re-evaluation started.' });
+});
+
+// POST: Restart / Re-run card execution
+app.post('/api/kanban/cards/:id/restart', (req, res) => {
+  const { id } = req.params;
+  const { projectId } = req.query;
+  const targetProjId = projectId || 'proj-default';
+
+  // Kill existing running process for this card if active
+  for (let i = runningProcesses.length - 1; i >= 0; i--) {
+    const item = runningProcesses[i];
+    if (item.cardId === id) {
+      try {
+        item.child.kill('SIGTERM');
+        setTimeout(() => { try { item.child.kill('SIGKILL'); } catch (e) {} }, 500);
+      } catch (err) {}
+      runningProcesses.splice(i, 1);
+    }
+  }
+
+  // Clear from queue if already queued
+  for (let i = agentExecutionQueue.length - 1; i >= 0; i--) {
+    if (agentExecutionQueue[i].cardId === id) {
+      agentExecutionQueue.splice(i, 1);
+    }
+  }
+
+  const { kanban, kanbanPath } = getProjectAndKanban(targetProjId);
+  const card = kanban.cards.find(c => c.id === id);
+  if (!card) {
+    return res.status(404).json({ error: 'Card not found' });
+  }
+
+  card.isProcessing = true;
+  fs.writeFileSync(kanbanPath, JSON.stringify(kanban, null, 2), 'utf8');
+
+  console.log(`[HermesCrew] Restarting execution for Card "${card.title}" (${card.id})...`);
+  setTimeout(() => {
+    triggerAgentForCard(id, card.columnId, targetProjId);
+  }, 300);
+
+  res.json({ success: true, message: 'Card task execution restarted.' });
+});
+
 // --- Agent CRUD Routes ---
 
 // GET: Get defined agents
@@ -1339,6 +1608,7 @@ function processAgentDirectives(freshKanban, freshCard, text) {
 
   // 1. Process CREATE_SUBCARD directives (only applicable if attached to a card)
   if (freshCard) {
+    if (!freshCard._createdSubcards) freshCard._createdSubcards = [];
     const subcardRegex = /\[CREATE_SUBCARD:\s*([^|\]]+)(?:\|\s*([^\]]+))?\]/gi;
     let subMatch;
     while ((subMatch = subcardRegex.exec(text)) !== null) {
@@ -1362,8 +1632,8 @@ function processAgentDirectives(freshKanban, freshCard, text) {
             }
           ],
           sessionId: null,
-          owner: 'unassigned',
-          watchers: [],
+          owner: freshCard.owner ? freshCard.owner : 'unassigned',
+          watchers: freshCard.watchers ? [...freshCard.watchers] : [],
           subCardIds: [],
           parentCardId: freshCard.id,
           meetingRounds: 0,
@@ -1372,6 +1642,7 @@ function processAgentDirectives(freshKanban, freshCard, text) {
         if (!freshCard.subCardIds) freshCard.subCardIds = [];
         freshCard.subCardIds.push(subCardId);
         freshKanban.cards.push(subCard);
+        freshCard._createdSubcards.push({ id: subCardId, columnId: subCard.columnId, title: subTitle });
         
         if (!freshCard.comments) freshCard.comments = [];
         freshCard.comments.push({
@@ -1506,7 +1777,7 @@ Please match the spelling exactly.
 
   const config = readConfig();
   const hermesPath = resolveHome(config.hermesPath);
-  const args = ['chat', '-q', prompt, '--yolo', '--accept-hooks', '-Q'];
+  const args = ['chat', '-q', prompt, '--yolo', '--accept-hooks'];
   
   if (card.sessionId) {
     args.push('--resume', card.sessionId);
@@ -1628,7 +1899,57 @@ Please match the spelling exactly.
   });
 }
 
+// --- Agent Concurrency Queue Manager ---
+const agentExecutionQueue = [];
+
 function triggerAgentForCard(cardId, columnId, projectId, transitionChainCount = 0) {
+  const targetProjId = projectId || 'proj-default';
+  const { kanban, kanbanPath } = getProjectAndKanban(targetProjId);
+  const card = kanban.cards.find(c => c.id === cardId);
+  const column = kanban.columns.find(col => col.id === columnId);
+
+  if (!card || !column || !column.agentEnabled || card.owner === 'user') {
+    return;
+  }
+
+  const isRunning = runningProcesses.some(p => p.cardId === cardId);
+  const existsInQueue = agentExecutionQueue.some(item => item.cardId === cardId);
+
+  if (isRunning) {
+    console.log(`[Queue Manager] Card ${cardId} is already executing. Skipping duplicate request.`);
+    return;
+  }
+
+  if (!existsInQueue) {
+    card.isProcessing = false;
+    card.isQueued = true;
+    card.agentSummary = '⏳ Queued for execution...';
+    fs.writeFileSync(kanbanPath, JSON.stringify(kanban, null, 2), 'utf8');
+
+    agentExecutionQueue.push({ cardId, columnId, projectId: targetProjId, transitionChainCount });
+    console.log(`[Queue Manager] Queued Card "${card.title}" (${cardId}). Current Queue Length: ${agentExecutionQueue.length}`);
+  }
+
+  processAgentExecutionQueue();
+}
+
+function processAgentExecutionQueue() {
+  const config = readConfig();
+  const maxConcurrent = config.maxConcurrentAgents || 3;
+
+  // Clean up any queue items that might be deleted/invalid
+  while (agentExecutionQueue.length > 0) {
+    const activeCardProcessesCount = runningProcesses.filter(p => p.cardId).length;
+    if (activeCardProcessesCount >= maxConcurrent) {
+      break;
+    }
+    const nextTask = agentExecutionQueue.shift();
+    console.log(`[Queue Dispatcher] Dequeuing and executing Card ${nextTask.cardId}...`);
+    runAgentForCardNow(nextTask.cardId, nextTask.columnId, nextTask.projectId, nextTask.transitionChainCount);
+  }
+}
+
+function runAgentForCardNow(cardId, columnId, projectId, transitionChainCount = 0) {
   // Prevent infinite loops
   if (transitionChainCount > 3) {
     console.log(`[HermesCrew] Max transition depth reached for card ${cardId}. Halting.`);
@@ -1833,9 +2154,8 @@ ${commentsHistory}
 
 [YOUR TASK STEPS]
 1. Analyze the card requirements against the team role agents listed above, and select the best qualified agent to own this task. Output [ASSIGN_TO: Agent Name].
-2. Perform the required work, execution, implementation, or data analysis for column phase "${column.name}".
-3. Autonomously split task: If you evaluate that this task is complex, multi-faceted, or contains distinct sub-steps, you MUST autonomously create sub-cards by outputting:
-   [CREATE_SUBCARD: Subcard Title | Subcard Description]
+2. Perform the required work, execution, implementation, or data analysis for column phase "${column.name}". Resolve multi-step subtasks internally within your own workflow execution whenever possible.
+3. Subcard creation guidelines (STRICT NECESSITY ONLY): Do NOT create sub-cards for routine multi-step work. ONLY output [CREATE_SUBCARD: Subcard Title | Subcard Description] if a subtask is genuinely too massive and strictly requires independent parallel tracking by separate team roles.
 4. When your work is complete or ready for the next phase, output [MOVE_TO: Target Column Name] (e.g. [MOVE_TO: Done] or next target column).
 
 Available transition columns: ${columnsList}
@@ -1859,9 +2179,8 @@ ${commentsHistory}
 
 [TRANSITION DIRECTIVES & WORKFLOW COMPLETION]
 You are processing this Kanban card as an autonomous agent.
-1. Perform the required task processing, implementation, code writing, or analysis for phase "${column.name}".
-2. Autonomously split task: If this task is complex or multi-step, autonomously split it into sub-tasks by outputting:
-   [CREATE_SUBCARD: Subcard Title | Subcard Description]
+1. Perform the required task processing, implementation, code writing, or analysis for phase "${column.name}". Process multi-step subtasks directly inside your own execution workflow.
+2. Subcard creation guidelines (STRICT NECESSITY ONLY): Do NOT create sub-cards for standard work steps. ONLY output [CREATE_SUBCARD: Subcard Title | Subcard Description] if a task is extraordinarily complex and strictly requires delegating to a separate asynchronous card.
 3. When your work on this card is finished or ready to move to another stage, you MUST output the following tag at the very end of your response:
 [MOVE_TO: Column Name] (For example: [MOVE_TO: Done] when completed).
 
@@ -1872,7 +2191,7 @@ Please match the spelling exactly.
 
   const config = readConfig();
   const hermesPath = resolveHome(config.hermesPath);
-  const args = ['chat', '-q', prompt, '--yolo', '--accept-hooks', '-Q'];
+  const args = ['chat', '-q', prompt, '--yolo', '--accept-hooks'];
   
   if (card.sessionId) {
     args.push('--resume', card.sessionId);
@@ -1939,6 +2258,13 @@ Please match the spelling exactly.
     }
 
     cleanedOutput = processAgentDirectives(freshKanban, freshCard, cleanedOutput);
+    const createdSubcards = freshCard._createdSubcards || [];
+    delete freshCard._createdSubcards;
+
+    if (createdSubcards.length > 0) {
+      console.log(`[HermesCrew] Card "${freshCard.title}" created ${createdSubcards.length} sub-tasks. Holding parent card in phase "${column.name}".`);
+      targetColName = null;
+    }
 
     if (!freshCard.comments) freshCard.comments = [];
     
@@ -1966,6 +2292,14 @@ Please match the spelling exactly.
       freshCard.agentSummary = code !== 0 ? 'Execution failed.' : 'No output returned.';
     }
 
+    // Check for watchers tag [SET_WATCHERS: Agent1, Agent2]
+    let targetWatchersStr = null;
+    const watchersMatch = cleanedOutput.match(/\[SET_WATCHERS:\s*([^\]]+)\]/i);
+    if (watchersMatch) {
+      targetWatchersStr = watchersMatch[1].trim();
+      cleanedOutput = cleanedOutput.replace(/\[SET_WATCHERS:\s*[^\]]+\]/gi, '').trim();
+    }
+
     // Apply assignment if found
     if (targetAssignment) {
       if (targetAssignment.toLowerCase() === 'user') {
@@ -1980,6 +2314,21 @@ Please match the spelling exactly.
           console.log(`[HermesCrew] Assignment update target agent "${targetAssignment}" not found.`);
         }
       }
+    }
+
+    // Apply watchers if found
+    if (targetWatchersStr) {
+      const names = targetWatchersStr.split(/[,|]/).map(n => n.trim().toLowerCase());
+      const matchedIds = [];
+      if (freshKanban.agents) {
+        freshKanban.agents.forEach(a => {
+          if (names.some(n => n === a.name.toLowerCase() || a.name.toLowerCase().includes(n))) {
+            matchedIds.push(a.id);
+          }
+        });
+      }
+      freshCard.watchers = matchedIds;
+      console.log(`[HermesCrew] Watchers update: Set ${matchedIds.length} watching agents for Card "${freshCard.title}".`);
     }
 
     freshCard.isProcessing = false;
@@ -1998,6 +2347,16 @@ Please match the spelling exactly.
     }
 
     fs.writeFileSync(freshKanbanPath, JSON.stringify(freshKanban, null, 2), 'utf8');
+
+    // Automatically trigger autonomous execution for newly created sub-cards
+    if (createdSubcards.length > 0) {
+      createdSubcards.forEach((sub, idx) => {
+        setTimeout(() => {
+          console.log(`[HermesCrew] Triggering autonomous execution for sub-card "${sub.title}" (${sub.id}) in column "${sub.columnId}"...`);
+          triggerAgentForCard(sub.id, sub.columnId, projectId, 0);
+        }, (idx + 1) * 1000);
+      });
+    }
 
     if (isMeetingRoomCol && meetingStatus === 'CONTINUE' && !triggeredNextColumnId) {
       if (freshCard.meetingRounds < freshCard.maxBudget) {

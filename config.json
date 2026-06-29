@@ -1,0 +1,5 @@
+{
+  "hermesPath": "/home/digimeta/.local/bin/hermes",
+  "hermesConfigDir": "/home/digimeta/.hermes",
+  "maxConcurrentAgents": 2
+}
