@@ -1408,14 +1408,14 @@ ${commentsHistory}
     let targetAssignment = null;
     const assignMatch = cleaned.match(/\[ASSIGN_TO:\s*([^\]]+)\]/i);
     if (assignMatch) {
-      targetAssignment = assignMatch[1].trim();
+      targetAssignment = assignMatch[1].replace(/\s+/g, ' ').trim();
       cleaned = cleaned.replace(/\[ASSIGN_TO:\s*[^\]]+\]/gi, '').trim();
     }
 
     let targetWatchersStr = null;
     const watchersMatch = cleaned.match(/\[SET_WATCHERS:\s*([^\]]+)\]/i);
     if (watchersMatch) {
-      targetWatchersStr = watchersMatch[1].trim();
+      targetWatchersStr = watchersMatch[1].replace(/\s+/g, ' ').trim();
       cleaned = cleaned.replace(/\[SET_WATCHERS:\s*[^\]]+\]/gi, '').trim();
     }
 
@@ -1435,7 +1435,7 @@ ${commentsHistory}
     }
 
     if (targetWatchersStr) {
-      const names = targetWatchersStr.split(/[,|]/).map(n => n.trim().toLowerCase());
+      const names = targetWatchersStr.split(/[,|]/).map(n => n.replace(/\s+/g, ' ').trim().toLowerCase());
       const matchedIds = [];
       if (freshKanban.agents) {
         freshKanban.agents.forEach(a => {
@@ -1839,7 +1839,7 @@ Please match the spelling exactly.
     let targetColName = null;
     const moveMatch = cleanedOutput.match(/\[MOVE_TO:\s*([^\]]+)\]/i);
     if (moveMatch) {
-      targetColName = moveMatch[1].trim();
+      targetColName = moveMatch[1].replace(/\s+/g, ' ').trim();
       cleanedOutput = cleanedOutput.replace(/\[MOVE_TO:\s*[^\]]+\]/gi, '').trim();
     }
 
@@ -2266,7 +2266,7 @@ Please match the spelling exactly.
     let targetAssignment = null;
     const assignMatch = cleanedOutput.match(/\[ASSIGN_TO:\s*([^\]]+)\]/i);
     if (assignMatch) {
-      targetAssignment = assignMatch[1].trim();
+      targetAssignment = assignMatch[1].replace(/\s+/g, ' ').trim();
       cleanedOutput = cleanedOutput.replace(/\[ASSIGN_TO:\s*[^\]]+\]/gi, '').trim();
     }
 
@@ -2274,7 +2274,7 @@ Please match the spelling exactly.
     let targetColName = null;
     const moveMatch = cleanedOutput.match(/\[MOVE_TO:\s*([^\]]+)\]/i);
     if (moveMatch) {
-      targetColName = moveMatch[1].trim();
+      targetColName = moveMatch[1].replace(/\s+/g, ' ').trim();
       cleanedOutput = cleanedOutput.replace(/\[MOVE_TO:\s*[^\]]+\]/gi, '').trim();
     }
 
@@ -2317,7 +2317,7 @@ Please match the spelling exactly.
     let targetWatchersStr = null;
     const watchersMatch = cleanedOutput.match(/\[SET_WATCHERS:\s*([^\]]+)\]/i);
     if (watchersMatch) {
-      targetWatchersStr = watchersMatch[1].trim();
+      targetWatchersStr = watchersMatch[1].replace(/\s+/g, ' ').trim();
       cleanedOutput = cleanedOutput.replace(/\[SET_WATCHERS:\s*[^\]]+\]/gi, '').trim();
     }
 
@@ -2339,7 +2339,7 @@ Please match the spelling exactly.
 
     // Apply watchers if found
     if (targetWatchersStr) {
-      const names = targetWatchersStr.split(/[,|]/).map(n => n.trim().toLowerCase());
+      const names = targetWatchersStr.split(/[,|]/).map(n => n.replace(/\s+/g, ' ').trim().toLowerCase());
       const matchedIds = [];
       if (freshKanban.agents) {
         freshKanban.agents.forEach(a => {
