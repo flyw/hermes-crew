@@ -35,7 +35,7 @@
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/hermes-crew.git
+   git clone https://github.com/flyw/hermes-crew.git
    cd hermes-crew
    ```
 
